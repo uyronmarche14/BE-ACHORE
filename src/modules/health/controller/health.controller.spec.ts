@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HealthController } from './health.controller';
-import { HealthResponse, HealthService } from '../service/health.service';
+import { HealthService, type HealthStatus } from '../service/health.service';
 
 describe('HealthController', () => {
   let healthController: HealthController;
@@ -14,16 +14,12 @@ describe('HealthController', () => {
     healthController = module.get<HealthController>(HealthController);
   });
 
-  it('returns the standard health envelope', () => {
+  it('returns the health payload', () => {
     const response = healthController.getHealth();
 
-    expect(response.success).toBe(true);
-    expect(response.data).toEqual<HealthResponse['data']>({
+    expect(response).toEqual<HealthStatus>({
       status: 'ok',
       service: 'archon-backend',
     });
-    expect(response.meta.requestId).toBe('health-check');
-    expect(response.meta.timestamp).toEqual(expect.any(String));
-    expect(response.error).toBeNull();
   });
 });

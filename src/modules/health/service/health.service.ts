@@ -1,32 +1,16 @@
 import { Injectable } from '@nestjs/common';
 
-export type HealthResponse = {
-  success: true;
-  data: {
-    status: 'ok';
-    service: 'archon-backend';
-  };
-  meta: {
-    requestId: 'health-check';
-    timestamp: string;
-  };
-  error: null;
+export type HealthStatus = {
+  status: 'ok';
+  service: 'archon-backend';
 };
 
 @Injectable()
 export class HealthService {
-  getHealthStatus(): HealthResponse {
+  getHealthStatus(): HealthStatus {
     return {
-      success: true,
-      data: {
-        status: 'ok',
-        service: 'archon-backend',
-      },
-      meta: {
-        requestId: 'health-check',
-        timestamp: new Date().toISOString(),
-      },
-      error: null,
+      status: 'ok',
+      service: 'archon-backend',
     };
   }
 }
