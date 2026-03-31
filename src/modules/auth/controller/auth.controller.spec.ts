@@ -47,14 +47,6 @@ describe('AuthController', () => {
             logout: jest.fn().mockResolvedValue({
               loggedOut: true,
             }),
-            getCurrentUser: jest.fn().mockResolvedValue({
-              user: {
-                id: 'user-1',
-                name: 'Jane Doe',
-                email: 'jane@example.com',
-                role: 'MEMBER',
-              },
-            }),
           },
         },
         {
@@ -201,14 +193,14 @@ describe('AuthController', () => {
     });
   });
 
-  it('returns the current user for a bearer token', async () => {
-    const result = await authController.getCurrentUser(
-      'Bearer access-token-value',
-    );
+  it('returns the current user from the guard-populated auth context', () => {
+    const result = authController.getCurrentUser({
+      id: 'user-1',
+      name: 'Jane Doe',
+      email: 'jane@example.com',
+      role: 'MEMBER',
+    });
 
-    expect(authService.getCurrentUser).toHaveBeenCalledWith(
-      'access-token-value',
-    );
     expect(result).toEqual({
       user: {
         id: 'user-1',

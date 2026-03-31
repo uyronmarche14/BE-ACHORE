@@ -13,6 +13,7 @@ import ms from 'ms';
 import { mapUserToAuthUserResponse } from '../mapper/auth.mapper';
 import { getAuthRuntimeConfig } from '../../../config/runtime-config';
 import type {
+  AuthUserResponse,
   CurrentUserResponse,
   LoginResult,
   LogoutResponse,
@@ -204,6 +205,16 @@ export class AuthService {
   async getCurrentUser(
     accessToken: string | null,
   ): Promise<CurrentUserResponse> {
+    const user = await this.authenticateAccessToken(accessToken);
+
+    return {
+      user,
+    };
+  }
+
+  async authenticateAccessToken(
+    accessToken: string | null,
+  ): Promise<AuthUserResponse> {
     if (!accessToken) {
       throw this.createUnauthenticatedException('Authentication is required');
     }
@@ -228,9 +239,7 @@ export class AuthService {
         throw this.createUnauthenticatedException('Authentication is required');
       }
 
-      return {
-        user: mapUserToAuthUserResponse(user),
-      };
+      return mapUserToAuthUserResponse(user);
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         throw error;

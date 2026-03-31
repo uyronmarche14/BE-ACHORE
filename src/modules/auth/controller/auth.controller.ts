@@ -1,8 +1,19 @@
-import { Body, Controller, Get, Headers, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
+import { CurrentUser } from '../decorators/current-user.decorator';
 import { LoginDto } from '../dto/login.dto';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import {
+  mapCurrentUserResponse,
   mapLoginResponse,
   mapLogoutResponse,
   mapRefreshResponse,
@@ -16,8 +27,9 @@ import type {
   LogoutResponse,
   RefreshAccessTokenResponse,
   SignupResponse,
+  AuthUserResponse,
 } from '../types/auth-response.type';
-import { extractBearerToken, getCookieValue } from '../utils/auth-request.util';
+import { getCookieValue } from '../utils/auth-request.util';
 import {
   clearRefreshTokenCookie,
   getRefreshCookieName,
@@ -104,13 +116,10 @@ export class AuthController {
   }
 
   @Get('me')
-  async getCurrentUser(
-    @Headers('authorization') authorizationHeader: string | undefined,
-  ): Promise<CurrentUserResponse> {
-    const currentUser = await this.authService.getCurrentUser(
-      extractBearerToken(authorizationHeader),
-    );
-
-    return currentUser;
+  @UseGuards(JwtAuthGuard)
+  getCurrentUser(
+    @CurrentUser() currentUser: AuthUserResponse,
+  ): CurrentUserResponse {
+    return mapCurrentUserResponse(currentUser);
   }
 }

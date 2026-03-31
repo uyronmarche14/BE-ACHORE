@@ -1,4 +1,3 @@
-import type { User } from '@prisma/client';
 import type {
   AuthUserResponse,
   AuthSessionResponse,
@@ -8,6 +7,7 @@ import type {
   RefreshAccessTokenResponse,
   SignupResponse,
 } from '../types/auth-response.type';
+import type { User } from '@prisma/client';
 
 export function mapUserToAuthUserResponse(user: User): AuthUserResponse {
   return {
@@ -43,9 +43,11 @@ export function mapRefreshResponse(
   };
 }
 
-export function mapCurrentUserResponse(user: User): CurrentUserResponse {
+export function mapCurrentUserResponse(
+  user: AuthUserResponse | User,
+): CurrentUserResponse {
   return {
-    user: mapUserToAuthUserResponse(user),
+    user: 'passwordHash' in user ? mapUserToAuthUserResponse(user) : user,
   };
 }
 

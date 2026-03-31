@@ -1,11 +1,15 @@
 export function extractBearerToken(
-  authorizationHeader: string | undefined,
+  authorizationHeader: string | string[] | undefined,
 ): string | null {
-  if (!authorizationHeader) {
+  const headerValue = Array.isArray(authorizationHeader)
+    ? authorizationHeader[0]
+    : authorizationHeader;
+
+  if (!headerValue) {
     return null;
   }
 
-  const [scheme, token] = authorizationHeader.split(' ');
+  const [scheme, token] = headerValue.split(' ');
 
   if (scheme !== 'Bearer' || !token) {
     return null;
@@ -15,14 +19,18 @@ export function extractBearerToken(
 }
 
 export function getCookieValue(
-  cookieHeader: string | undefined,
+  cookieHeader: string | string[] | undefined,
   cookieName: string,
 ): string | null {
-  if (!cookieHeader) {
+  const headerValue = Array.isArray(cookieHeader)
+    ? cookieHeader[0]
+    : cookieHeader;
+
+  if (!headerValue) {
     return null;
   }
 
-  const cookieParts = cookieHeader.split(';');
+  const cookieParts = headerValue.split(';');
 
   for (const cookiePart of cookieParts) {
     const [rawName, ...rawValueParts] = cookiePart.trim().split('=');
