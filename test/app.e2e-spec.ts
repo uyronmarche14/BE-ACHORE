@@ -17,6 +17,7 @@ import { ResponseEnvelopeInterceptor } from './../src/common/interceptors/respon
 import { RequestIdMiddleware } from './../src/common/middleware/request-id.middleware';
 import { createGlobalValidationPipe } from './../src/common/pipes/global-validation.pipe';
 import type { RequestWithContext } from './../src/common/types/request-context.type';
+import { PrismaService } from './../src/database/prisma.service';
 import { HealthController } from './../src/modules/health/controller/health.controller';
 
 class EchoBodyDto {
@@ -26,13 +27,21 @@ class EchoBodyDto {
 }
 
 describe('App bootstrap (e2e)', () => {
-  let app: INestApplication;
+  let app: INestApplication | undefined;
   let healthController: HealthController;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue({
+        onModuleInit: jest.fn(),
+        onModuleDestroy: jest.fn(),
+        $connect: jest.fn(),
+        $disconnect: jest.fn(),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
@@ -152,7 +161,7 @@ describe('App bootstrap (e2e)', () => {
   });
 
   afterEach(async () => {
-    await app.close();
+    await app?.close();
   });
 });
 

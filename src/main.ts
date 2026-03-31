@@ -9,7 +9,12 @@ async function bootstrap() {
   configureApplication(app);
 
   const configService = app.get(ConfigService);
-  const { port } = getAppRuntimeConfig(configService);
+  const { port, frontendUrl } = getAppRuntimeConfig(configService);
+
+  app.enableCors({
+    origin: frontendUrl,
+    credentials: true,
+  });
 
   await app.listen(port);
 }

@@ -6,7 +6,7 @@ export const environmentValidationSchema = Joi.object({
   FRONTEND_URL: Joi.string().uri().default('http://localhost:3000'),
   DATABASE_URL: Joi.string()
     .uri({ scheme: ['mysql'] })
-    .default('mysql://dowinn:dowinn@localhost:3306/dowinn'),
+    .default('mysql://dowinn:dowinn@127.0.0.1:3308/dowinn'),
   JWT_ACCESS_SECRET: Joi.string().min(16).default('change-me-access-secret'),
   JWT_REFRESH_SECRET: Joi.string().min(16).default('change-me-refresh-secret'),
   JWT_ACCESS_TTL: Joi.string().default('15m'),
@@ -20,5 +20,7 @@ export const environmentValidationSchema = Joi.object({
 });
 
 export function getEnvironmentFilePaths() {
-  return ['.env.local', '.env'];
+  const nodeEnv = process.env.NODE_ENV ?? 'development';
+
+  return [`.env.${nodeEnv}.local`, `.env.${nodeEnv}`, '.env.local', '.env'];
 }

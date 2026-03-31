@@ -5,6 +5,8 @@ import {
   environmentValidationSchema,
   getEnvironmentFilePaths,
 } from './config/environment';
+import { DatabaseModule } from './database/database.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -16,6 +18,8 @@ import { HealthModule } from './modules/health/health.module';
       validationSchema: environmentValidationSchema,
       expandVariables: true,
     }),
+    DatabaseModule,
+    AuthModule,
     HealthModule,
   ],
 })

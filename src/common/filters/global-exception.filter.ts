@@ -4,6 +4,7 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import type { ApiErrorCode, ApiErrorPayload } from '../types/api-envelope.type';
@@ -19,11 +20,15 @@ type HttpExceptionResponseShape = {
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(GlobalExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     const http = host.switchToHttp();
     const request = http.getRequest<RequestWithContext>();
     const response = http.getResponse<Response>();
     const statusCode = this.getStatusCode(exception);
+
+    this.logExceptionInDevelopment(exception, request, statusCode);
 
     response.status(statusCode).json({
       success: false,
@@ -81,5 +86,37 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message: 'An unexpected error occurred',
       details: null,
     };
+  }
+
+  private logExceptionInDevelopment(
+    exception: unknown,
+    request: RequestWithContext,
+    statusCode: number,
+  ) {
+    if (process.env.NODE_ENV === 'production') {
+      return;
+    }
+
+    const requestLabel = `${request.method ?? 'UNKNOWN'} ${request.originalUrl ?? request.url ?? 'unknown-route'}`;
+    const requestId = request.requestId ?? 'unknown-request';
+
+    if (exception instanceof HttpException) {
+      this.logger.warn(
+        `[${requestId}] ${requestLabel} -> ${statusCode} ${exception.message}`,
+      );
+      return;
+    }
+
+    if (exception instanceof Error) {
+      this.logger.error(
+        `[${requestId}] ${requestLabel} -> ${statusCode} ${exception.message}`,
+        exception.stack,
+      );
+      return;
+    }
+
+    this.logger.error(
+      `[${requestId}] ${requestLabel} -> ${statusCode} ${JSON.stringify(exception)}`,
+    );
   }
 }
