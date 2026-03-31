@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum AppRole {
+  ADMIN
+  MEMBER
+}
+
+enum ProjectMemberRole {
+  OWNER
+  MEMBER
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum TaskLogEventType {
+  TASK_CREATED
+  TASK_UPDATED
+  STATUS_CHANGED
+}
+
+model User {
+  id            String         @id @default(uuid()) @db.Char(36)
+  name          String         @db.VarChar(120)
+  email         String         @unique @db.VarChar(190)
+  passwordHash  String         @map("password_hash") @db.VarChar(255)
+  role          AppRole        @default(MEMBER)
+  refreshTokens RefreshToken[]
+  projectsOwned Project[]      @relation("ProjectOwner")
+  memberships   ProjectMember[]
+  tasksAssigned Task[]         @relation("TaskAssignee")
+  tasksCreated  Task[]         @relation("TaskCreatedBy")
+  tasksUpdated  Task[]         @relation("TaskUpdatedBy")
+  taskLogs      TaskLog[]      @relation("TaskLogActor")
+  createdAt     DateTime       @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Char(36)
+  userId    String    @map("user_id") @db.Char(36)
+  tokenHash String    @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.DateTime(3)
+  revokedAt DateTime? @map("revoked_at") @db.DateTime(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Project {
+  id          String          @id @default(uuid()) @db.Char(36)
+  name        String          @db.VarChar(120)
+  description String?         @db.Text
+  ownerId     String          @map("owner_id") @db.Char(36)
+  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  members     ProjectMember[]
+  tasks       Task[]
+  createdAt   DateTime        @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@index([ownerId])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String            @id @default(uuid()) @db.Char(36)
+  projectId String            @map("project_id") @db.Char(36)
+  userId    String            @map("user_id") @db.Char(36)
+  role      ProjectMemberRole @default(MEMBER)
+  createdAt DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+model Task {
+  id          String     @id @default(uuid()) @db.Char(36)
+  projectId   String     @map("project_id") @db.Char(36)
+  title       String     @db.VarChar(160)
+  description String?    @db.Text
+  status      TaskStatus @default(TODO)
+  position    Int?
+  assigneeId  String?    @map("assignee_id") @db.Char(36)
+  dueDate     DateTime?  @map("due_date") @db.Date
+  createdById String     @map("created_by") @db.Char(36)
+  updatedById String?    @map("updated_by") @db.Char(36)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.DateTime(3)
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdBy   User       @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  updatedBy   User?      @relation("TaskUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  taskLogs    TaskLog[]
+
+  @@index([projectId])
+  @@index([projectId, status])
+  @@map("tasks")
+}
+
+model TaskLog {
+  id        String           @id @default(uuid()) @db.Char(36)
+  taskId    String           @map("task_id") @db.Char(36)
+  actorId   String           @map("actor_id") @db.Char(36)
+  eventType TaskLogEventType @map("event_type")
+  fieldName String?          @map("field_name") @db.VarChar(80)
+  oldValue  Json?            @map("old_value")
+  newValue  Json?            @map("new_value")
+  summary   String           @db.VarChar(255)
+  createdAt DateTime         @default(now()) @map("created_at") @db.DateTime(3)
+  task      Task             @relation(fields: [taskId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  actor     User             @relation("TaskLogActor", fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("task_logs")
+}
