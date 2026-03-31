@@ -26,12 +26,14 @@ export function getAppRuntimeConfig(
     jwtAccessTtl: configService.getOrThrow<StringValue>('JWT_ACCESS_TTL'),
     jwtRefreshTtl: configService.getOrThrow<StringValue>('JWT_REFRESH_TTL'),
     refreshCookieName: configService.getOrThrow<string>('REFRESH_COOKIE_NAME'),
-    refreshCookieSecure: configService.getOrThrow<boolean>(
-      'REFRESH_COOKIE_SECURE',
-    ),
     nodeEnv: configService.getOrThrow<'development' | 'test' | 'production'>(
       'NODE_ENV',
     ),
+    refreshCookieSecure:
+      configService.get<boolean>('REFRESH_COOKIE_SECURE') ??
+      configService.getOrThrow<'development' | 'test' | 'production'>(
+        'NODE_ENV',
+      ) === 'production',
   };
 }
 

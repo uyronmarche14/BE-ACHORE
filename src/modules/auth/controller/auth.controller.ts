@@ -9,8 +9,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
+import { AuthRateLimit } from '../decorators/auth-rate-limit.decorator';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { LoginDto } from '../dto/login.dto';
+import { AuthRateLimitGuard } from '../guards/auth-rate-limit.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import {
   mapCurrentUserResponse,
@@ -44,6 +46,12 @@ export class AuthController {
   ) {}
 
   @Post('signup')
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit({
+    key: 'signup',
+    limit: 5,
+    windowMs: 60_000,
+  })
   async signup(
     @Body() signupDto: SignupDto,
     @Res({ passthrough: true }) response: Response,
@@ -61,6 +69,12 @@ export class AuthController {
   }
 
   @Post('login')
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit({
+    key: 'login',
+    limit: 5,
+    windowMs: 60_000,
+  })
   async login(
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) response: Response,
@@ -78,6 +92,12 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit({
+    key: 'refresh',
+    limit: 20,
+    windowMs: 60_000,
+  })
   async refresh(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,

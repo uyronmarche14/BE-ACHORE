@@ -1,10 +1,16 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 
+import { UnauthorizedException, type ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { Request, Response } from 'express';
 import { AuthController } from './auth.controller';
+import { AuthRateLimitGuard } from '../guards/auth-rate-limit.guard';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { AuthRateLimitService } from '../service/auth-rate-limit.service';
 import { AuthService } from '../service/auth.service';
+import type { AuthenticatedRequest } from '../types/authenticated-request.type';
 
 describe('AuthController', () => {
   let authController: AuthController;
@@ -14,6 +20,9 @@ describe('AuthController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
+        Reflector,
+        AuthRateLimitGuard,
+        AuthRateLimitService,
         {
           provide: AuthService,
           useValue: {
@@ -47,6 +56,7 @@ describe('AuthController', () => {
             logout: jest.fn().mockResolvedValue({
               loggedOut: true,
             }),
+            authenticateAccessToken: jest.fn(),
           },
         },
         {
@@ -67,6 +77,13 @@ describe('AuthController', () => {
               };
 
               return config[key];
+            }),
+            get: jest.fn((key: string) => {
+              if (key === 'REFRESH_COOKIE_SECURE') {
+                return false;
+              }
+
+              return undefined;
             }),
           },
         },
@@ -168,6 +185,51 @@ describe('AuthController', () => {
     );
   });
 
+  it('supports refresh-token recovery after an expired access token is rejected', async () => {
+    const jwtAuthGuard = new JwtAuthGuard(authService);
+    const protectedRequest = {
+      headers: {
+        authorization: 'Bearer expired-access-token',
+      },
+    } as AuthenticatedRequest;
+    const refreshRequest = {
+      headers: {
+        authorization: 'Bearer expired-access-token',
+        cookie: 'archon_refresh_token=existing-refresh-token',
+      },
+    } as Request;
+    const response = createResponse();
+
+    authService.authenticateAccessToken.mockRejectedValue(
+      new UnauthorizedException({
+        code: 'UNAUTHENTICATED',
+        message: 'Authentication is required',
+        details: null,
+      }),
+    );
+
+    await expect(
+      jwtAuthGuard.canActivate(createExecutionContext(protectedRequest)),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    const result = await authController.refresh(refreshRequest, response);
+
+    expect(authService.refresh).toHaveBeenCalledWith('existing-refresh-token');
+    expect(result).toEqual({
+      accessToken: 'rotated-access-token',
+    });
+    expect(response.cookie).toHaveBeenCalledWith(
+      'archon_refresh_token',
+      'rotated-refresh-token',
+      expect.objectContaining({
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        path: '/',
+      }),
+    );
+  });
+
   it('clears the refresh cookie on logout', async () => {
     const request = {
       headers: {
@@ -220,4 +282,16 @@ function createResponse() {
     cookie: jest.Mock;
     clearCookie: jest.Mock;
   };
+}
+
+function createExecutionContext(
+  request: AuthenticatedRequest,
+): ExecutionContext {
+  return {
+    switchToHttp: () => ({
+      getRequest: () => request,
+      getResponse: () => undefined,
+      getNext: () => undefined,
+    }),
+  } as ExecutionContext;
 }

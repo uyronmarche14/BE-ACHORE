@@ -54,6 +54,13 @@ describe('AuthService', () => {
 
       return config[key];
     }),
+    get: jest.fn((key: string) => {
+      if (key === 'REFRESH_COOKIE_SECURE') {
+        return false;
+      }
+
+      return undefined;
+    }),
   } as unknown as ConfigService;
 
   const mockJwtService = {

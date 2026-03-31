@@ -1,0 +1,66 @@
+import {
+  CanActivate,
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import type { Request } from 'express';
+import { AUTH_RATE_LIMIT_METADATA } from '../constants/auth-metadata.constant';
+import { AuthRateLimitService } from '../service/auth-rate-limit.service';
+import type { AuthRateLimitMetadata } from '../types/auth-rate-limit.type';
+
+@Injectable()
+export class AuthRateLimitGuard implements CanActivate {
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly authRateLimitService: AuthRateLimitService,
+  ) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    const metadata = this.reflector.getAllAndOverride<AuthRateLimitMetadata>(
+      AUTH_RATE_LIMIT_METADATA,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (!metadata) {
+      return true;
+    }
+
+    const request = context.switchToHttp().getRequest<Request>();
+    const clientId = getClientIdentifier(request);
+    const allowed = this.authRateLimitService.consume(metadata, clientId);
+
+    if (!allowed) {
+      throw new HttpException(
+        {
+          code: 'RATE_LIMITED',
+          message: 'Too many auth attempts. Please try again later.',
+          details: null,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    return true;
+  }
+}
+
+function getClientIdentifier(request: Request) {
+  const forwardedFor = request.headers['x-forwarded-for'];
+
+  if (typeof forwardedFor === 'string' && forwardedFor.trim().length > 0) {
+    return forwardedFor.split(',')[0].trim();
+  }
+
+  if (Array.isArray(forwardedFor) && forwardedFor[0]) {
+    return forwardedFor[0].trim();
+  }
+
+  if (request.ip) {
+    return request.ip;
+  }
+
+  return request.socket.remoteAddress ?? 'unknown-client';
+}
