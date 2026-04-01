@@ -21,6 +21,11 @@ import { ResourceAuthorizationService } from './service/resource-authorization.s
     ResourceAccessGuard,
     ResourceAuthorizationService,
   ],
-  exports: [JwtAuthGuard, ResourceAccessGuard, ResourceAuthorizationService],
+  exports: [
+    AuthService,
+    JwtAuthGuard,
+    ResourceAccessGuard,
+    ResourceAuthorizationService,
+  ],
 })
 export class AuthModule {}
