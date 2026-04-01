@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "3d8f6f4f-b6cb-4a7f-b0a7-0f6b767c2fa6",
-    "name": "Archon Backend - Auth and Projects",
-    "description": "Postman coverage for the recently implemented backend flows: auth session endpoints and project CRUD. Run the collection in order with the local environment and Postman cookie jar enabled.",
+    "name": "Archon Backend - Auth, Projects, and Tasks",
+    "description": "Postman coverage for the recently implemented backend flows: auth session endpoints plus project and task CRUD. Run the collection in order with the local environment and Postman cookie jar enabled.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -63,8 +63,28 @@
       "value": ""
     },
     {
+      "key": "taskId",
+      "value": ""
+    },
+    {
+      "key": "taskTitle",
+      "value": ""
+    },
+    {
+      "key": "taskDescription",
+      "value": ""
+    },
+    {
+      "key": "updatedTaskTitle",
+      "value": ""
+    },
+    {
       "key": "missingProjectId",
       "value": "missing-project-id"
+    },
+    {
+      "key": "missingTaskId",
+      "value": "missing-task-id"
     }
   ],
   "item": [
@@ -87,9 +107,13 @@
                   "pm.collectionVariables.set('projectName', `Launch ${runId}`);",
                   "pm.collectionVariables.set('projectDescription', 'Track launch tasks');",
                   "pm.collectionVariables.set('updatedProjectName', `Updated ${runId}`);",
+                  "pm.collectionVariables.set('taskTitle', `Checklist ${runId}`);",
+                  "pm.collectionVariables.set('taskDescription', 'Prepare go-live readiness checklist');",
+                  "pm.collectionVariables.set('updatedTaskTitle', `Updated checklist ${runId}`);",
                   "pm.collectionVariables.unset('ownerAccessToken');",
                   "pm.collectionVariables.unset('outsiderAccessToken');",
-                  "pm.collectionVariables.unset('projectId');"
+                  "pm.collectionVariables.unset('projectId');",
+                  "pm.collectionVariables.unset('taskId');"
                 ]
               }
             },
@@ -709,6 +733,361 @@
               "path": [
                 "projects",
                 "{{missingProjectId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('create task returns 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('create task returns board-ready task payload', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.projectId).to.eql(pm.collectionVariables.get('projectId'));",
+                  "  pm.expect(body.data.title).to.eql(pm.collectionVariables.get('taskTitle'));",
+                  "  pm.expect(body.data.description).to.eql(pm.collectionVariables.get('taskDescription'));",
+                  "  pm.expect(body.data.status).to.eql('TODO');",
+                  "  pm.expect(body.data.position).to.eql(null);",
+                  "});",
+                  "pm.collectionVariables.set('taskId', body.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{taskTitle}}\",\n  \"description\": \"{{taskDescription}}\",\n  \"status\": \"TODO\",\n  \"dueDate\": \"2026-04-10\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/projects/{{projectId}}/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projects",
+                "{{projectId}}",
+                "tasks"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('get task returns 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('get task returns created task payload', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.id).to.eql(pm.collectionVariables.get('taskId'));",
+                  "  pm.expect(body.data.projectId).to.eql(pm.collectionVariables.get('projectId'));",
+                  "  pm.expect(body.data.status).to.eql('TODO');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                "{{taskId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('update task returns 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('update task can clear nullable fields explicitly', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.id).to.eql(pm.collectionVariables.get('taskId'));",
+                  "  pm.expect(body.data.title).to.eql(pm.collectionVariables.get('updatedTaskTitle'));",
+                  "  pm.expect(body.data.description).to.eql(null);",
+                  "  pm.expect(body.data.dueDate).to.eql(null);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{updatedTaskTitle}}\",\n  \"description\": null,\n  \"dueDate\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                "{{taskId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tasks Require Auth",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('task detail without bearer token returns 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('task detail without bearer token returns normalized auth error', function () {",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error.code).to.eql('UNAUTHENTICATED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                "{{taskId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Forbidden Task Detail As Outsider",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('outsider task detail returns 403', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test('outsider task detail returns normalized forbidden error', function () {",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error.code).to.eql('FORBIDDEN');",
+                  "  pm.expect(body.error.message).to.eql('You do not have access to this task');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{outsiderAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                "{{taskId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Missing Task Detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('missing task detail returns 404', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('missing task detail returns normalized not found error', function () {",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error.code).to.eql('NOT_FOUND');",
+                  "  pm.expect(body.error.message).to.eql('Task not found');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/{{missingTaskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                "{{missingTaskId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('delete task returns 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('delete task returns success message', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.message).to.eql('Task deleted successfully');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                "{{taskId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Deleted Task Returns 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('deleted task detail returns 404', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('deleted task detail returns normalized not found error', function () {",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error.code).to.eql('NOT_FOUND');",
+                  "  pm.expect(body.error.message).to.eql('Task not found');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                "{{taskId}}"
               ]
             }
           }
