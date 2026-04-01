@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   UseGuards,
@@ -18,15 +19,26 @@ import { ResourceAccessGuard } from '../../auth/guards/resource-access.guard';
 import type { AuthUserResponse } from '../../auth/types/auth-response.type';
 import { CreateTaskDto } from '../dto/create-task.dto';
 import { UpdateTaskDto } from '../dto/update-task.dto';
+import { UpdateTaskStatusDto } from '../dto/update-task-status.dto';
 import { TasksService } from '../service/tasks.service';
 import type {
   DeleteTaskResponse,
+  ProjectTasksResponse,
   TaskResponse,
 } from '../types/task-response.type';
 
 @Controller()
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
+
+  @Get('projects/:projectId/tasks')
+  @UseGuards(JwtAuthGuard, ResourceAccessGuard)
+  @RequireProjectAccess()
+  listProjectTasks(
+    @Param('projectId') projectId: string,
+  ): Promise<ProjectTasksResponse> {
+    return this.tasksService.listProjectTasks(projectId);
+  }
 
   @Post('projects/:projectId/tasks')
   @UseGuards(JwtAuthGuard, ResourceAccessGuard)
@@ -55,6 +67,21 @@ export class TasksController {
     @Body() updateTaskDto: UpdateTaskDto,
   ): Promise<TaskResponse> {
     return this.tasksService.updateTask(currentUser, taskId, updateTaskDto);
+  }
+
+  @Patch('tasks/:taskId/status')
+  @UseGuards(JwtAuthGuard, ResourceAccessGuard)
+  @RequireTaskAccess()
+  updateTaskStatus(
+    @CurrentUser() currentUser: AuthUserResponse,
+    @Param('taskId') taskId: string,
+    @Body() updateTaskStatusDto: UpdateTaskStatusDto,
+  ): Promise<TaskResponse> {
+    return this.tasksService.updateTaskStatus(
+      currentUser,
+      taskId,
+      updateTaskStatusDto,
+    );
   }
 
   @Delete('tasks/:taskId')

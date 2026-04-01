@@ -6,6 +6,13 @@ import { TasksService } from '../service/tasks.service';
 
 describe('TasksController', () => {
   const tasksService = {
+    listProjectTasks: jest.fn().mockResolvedValue({
+      taskGroups: {
+        TODO: [],
+        IN_PROGRESS: [],
+        DONE: [],
+      },
+    }),
     createTask: jest.fn().mockResolvedValue({
       id: 'task-1',
       projectId: 'project-1',
@@ -42,6 +49,18 @@ describe('TasksController', () => {
       createdAt: '2026-04-01T09:00:00.000Z',
       updatedAt: '2026-04-02T10:00:00.000Z',
     }),
+    updateTaskStatus: jest.fn().mockResolvedValue({
+      id: 'task-1',
+      projectId: 'project-1',
+      title: 'Review release notes',
+      description: null,
+      status: TaskStatus.DONE,
+      position: null,
+      assigneeId: null,
+      dueDate: null,
+      createdAt: '2026-04-01T09:00:00.000Z',
+      updatedAt: '2026-04-02T12:00:00.000Z',
+    }),
     deleteTask: jest.fn().mockResolvedValue({
       message: 'Task deleted successfully',
     }),
@@ -58,6 +77,12 @@ describe('TasksController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('lists project tasks by route parameter', async () => {
+    await tasksController.listProjectTasks('project-1');
+
+    expect(tasksService.listProjectTasks).toHaveBeenCalledWith('project-1');
   });
 
   it('creates a task inside the route project for the current user', async () => {
@@ -102,5 +127,21 @@ describe('TasksController', () => {
     await tasksController.deleteTask('task-1');
 
     expect(tasksService.deleteTask).toHaveBeenCalledWith('task-1');
+  });
+
+  it('patches a task status by route parameter', async () => {
+    await tasksController.updateTaskStatus(currentUser, 'task-1', {
+      status: TaskStatus.DONE,
+      position: null,
+    });
+
+    expect(tasksService.updateTaskStatus).toHaveBeenCalledWith(
+      currentUser,
+      'task-1',
+      {
+        status: TaskStatus.DONE,
+        position: null,
+      },
+    );
   });
 });

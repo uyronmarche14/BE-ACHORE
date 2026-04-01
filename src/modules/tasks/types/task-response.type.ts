@@ -17,6 +17,12 @@ export type DeleteTaskResponse = {
   message: string;
 };
 
+export type TaskGroupsResponse = Record<TaskStatus, TaskResponse[]>;
+
+export type ProjectTasksResponse = {
+  taskGroups: TaskGroupsResponse;
+};
+
 export type TaskRecord = {
   id: string;
   projectId: string;
@@ -29,3 +35,5 @@ export type TaskRecord = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type TaskGroupRecords = Record<TaskStatus, TaskRecord[]>;

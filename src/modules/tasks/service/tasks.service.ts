@@ -4,13 +4,20 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { TaskStatus } from '@prisma/client';
+import { groupTaskRecordsByStatus } from '../../../common/utils/task-groups.util';
 import { PrismaService } from '../../../database/prisma.service';
 import type { AuthUserResponse } from '../../auth/types/auth-response.type';
-import { mapDeleteTaskResponse, mapTaskResponse } from '../mapper/tasks.mapper';
+import {
+  mapDeleteTaskResponse,
+  mapProjectTasksResponse,
+  mapTaskResponse,
+} from '../mapper/tasks.mapper';
 import type { CreateTaskDto } from '../dto/create-task.dto';
 import type { UpdateTaskDto } from '../dto/update-task.dto';
+import type { UpdateTaskStatusDto } from '../dto/update-task-status.dto';
 import type {
   DeleteTaskResponse,
+  ProjectTasksResponse,
   TaskResponse,
 } from '../types/task-response.type';
 
@@ -39,6 +46,17 @@ export class TasksService {
     });
 
     return mapTaskResponse(createdTask);
+  }
+
+  async listProjectTasks(projectId: string): Promise<ProjectTasksResponse> {
+    const tasks = await this.prismaService.task.findMany({
+      where: {
+        projectId,
+      },
+      select: taskResponseSelect,
+    });
+
+    return mapProjectTasksResponse(groupTaskRecordsByStatus(tasks));
   }
 
   async getTask(taskId: string): Promise<TaskResponse> {
@@ -107,6 +125,34 @@ export class TasksService {
                   : null,
               }
             : {}),
+          updatedById: currentUser.id,
+        },
+        select: taskResponseSelect,
+      });
+
+      return mapTaskResponse(updatedTask);
+    } catch (error) {
+      if (isPrismaRecordNotFoundError(error)) {
+        throw this.createTaskNotFoundException();
+      }
+
+      throw error;
+    }
+  }
+
+  async updateTaskStatus(
+    currentUser: AuthUserResponse,
+    taskId: string,
+    updateTaskStatusDto: UpdateTaskStatusDto,
+  ): Promise<TaskResponse> {
+    try {
+      const updatedTask = await this.prismaService.task.update({
+        where: {
+          id: taskId,
+        },
+        data: {
+          status: updateTaskStatusDto.status,
+          position: updateTaskStatusDto.position ?? null,
           updatedById: currentUser.id,
         },
         select: taskResponseSelect,

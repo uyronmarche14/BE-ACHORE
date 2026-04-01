@@ -256,7 +256,23 @@ Save:
 
 - `data.id` -> `taskId`
 
-### 15. Get Task
+### 15. Load Project Task Groups
+
+- Method: `GET`
+- URL: `{{baseUrl}}/projects/{{projectId}}/tasks`
+- Headers:
+  - `Authorization: Bearer {{ownerAccessToken}}`
+- Body: none
+
+Expected status: `200`
+
+Expected grouped payload:
+
+- `data.taskGroups.TODO`
+- `data.taskGroups.IN_PROGRESS`
+- `data.taskGroups.DONE`
+
+### 16. Get Task
 
 - Method: `GET`
 - URL: `{{baseUrl}}/tasks/{{taskId}}`
@@ -266,7 +282,7 @@ Save:
 
 Expected status: `200`
 
-### 16. Update Task
+### 17. Update Task
 
 - Method: `PUT`
 - URL: `{{baseUrl}}/tasks/{{taskId}}`
@@ -285,7 +301,31 @@ Expected status: `200`
 
 Expected status: `200`
 
-### 17. Tasks Require Auth
+### 18. Tasks Require Auth
+
+- Method: `PATCH`
+- URL: `{{baseUrl}}/tasks/{{taskId}}/status`
+- Headers:
+  - `Authorization: Bearer {{ownerAccessToken}}`
+  - `Content-Type: application/json`
+- Body:
+
+```json
+{
+  "status": "DONE",
+  "position": null
+}
+```
+
+Expected status: `200`
+
+Expected payload:
+
+- `data.status`
+- `data.position`
+- `data.updatedAt`
+
+### 19. Tasks Require Auth
 
 - Method: `GET`
 - URL: `{{baseUrl}}/tasks/{{taskId}}`
@@ -294,7 +334,7 @@ Expected status: `200`
 
 Expected status: `401`
 
-### 18. Forbidden Task Detail As Outsider
+### 20. Forbidden Task Detail As Outsider
 
 - Method: `GET`
 - URL: `{{baseUrl}}/tasks/{{taskId}}`
@@ -304,7 +344,7 @@ Expected status: `401`
 
 Expected status: `403`
 
-### 19. Missing Task Detail
+### 21. Missing Task Detail
 
 - Method: `GET`
 - URL: `{{baseUrl}}/tasks/{{missingTaskId}}`
@@ -314,7 +354,7 @@ Expected status: `403`
 
 Expected status: `404`
 
-### 20. Delete Task
+### 22. Delete Task
 
 - Method: `DELETE`
 - URL: `{{baseUrl}}/tasks/{{taskId}}`
@@ -324,7 +364,7 @@ Expected status: `404`
 
 Expected status: `200`
 
-### 21. Deleted Task Returns 404
+### 23. Deleted Task Returns 404
 
 - Method: `GET`
 - URL: `{{baseUrl}}/tasks/{{taskId}}`
@@ -336,7 +376,7 @@ Expected status: `404`
 
 ## Cleanup
 
-### 22. Delete Project As Owner
+### 24. Delete Project As Owner
 
 - Method: `DELETE`
 - URL: `{{baseUrl}}/projects/{{projectId}}`
@@ -346,7 +386,7 @@ Expected status: `404`
 
 Expected status: `200`
 
-### 23. Deleted Project Returns 404
+### 25. Deleted Project Returns 404
 
 - Method: `GET`
 - URL: `{{baseUrl}}/projects/{{projectId}}`
@@ -356,7 +396,7 @@ Expected status: `200`
 
 Expected status: `404`
 
-### 24. Logout Owner
+### 26. Logout Owner
 
 - Method: `POST`
 - URL: `{{baseUrl}}/auth/logout`

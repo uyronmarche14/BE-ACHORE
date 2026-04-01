@@ -6,7 +6,7 @@ Current scope:
 
 - application bootstrap verification
 - health module wiring verification
-- auth, authorization, project CRUD, and task CRUD e2e coverage
+- auth, authorization, project CRUD, task CRUD, and project task loading e2e coverage
 - Postman collection assets for manual API verification live in `test/postman/`
 
 ## Postman Coverage
@@ -23,6 +23,10 @@ The collection covers:
 - project create, list, detail, update, and delete
 - task create, get, update, and delete
 - unauthenticated `401`, access-control `403`, and missing-resource `404` cases
+
+The manual Postman guide also covers:
+
+- grouped `GET /projects/:projectId/tasks` board loading verification
 
 Run notes:
 

@@ -325,7 +325,7 @@ async function executeProjectRoute({
       request.user,
       request.params.projectId,
       body,
-    ) as ReturnType<ProjectsController['updateProject']>;
+    );
   }
 
   return controllerMethod.call(

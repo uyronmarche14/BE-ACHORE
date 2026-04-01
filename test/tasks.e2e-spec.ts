@@ -37,6 +37,7 @@ describe('TasksController (e2e)', () => {
     },
     task: {
       create: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -48,6 +49,7 @@ describe('TasksController (e2e)', () => {
     mockPrismaService.project.findUnique.mockReset();
     mockPrismaService.projectMember.findUnique.mockReset();
     mockPrismaService.task.create.mockReset();
+    mockPrismaService.task.findMany.mockReset();
     mockPrismaService.task.findUnique.mockReset();
     mockPrismaService.task.update.mockReset();
     mockPrismaService.task.delete.mockReset();
@@ -143,7 +145,7 @@ describe('TasksController (e2e)', () => {
     });
   });
 
-  it('returns a normalized 404 envelope when a guarded project does not exist during task creation', async () => {
+  it('returns a normalized 404 envelope when a guarded project does not exist during board task loading', async () => {
     mockPrismaService.project.findUnique.mockResolvedValue(null);
 
     const request = createRequest({
@@ -160,11 +162,8 @@ describe('TasksController (e2e)', () => {
         controller,
         jwtAuthGuard,
         resourceAccessGuard,
-        method: 'createTask',
+        method: 'listProjectTasks',
         request,
-        body: {
-          title: 'Ship launch checklist',
-        },
       });
     } catch (error) {
       exceptionFilter.catch(error, createArgumentsHost(request, response));
@@ -182,6 +181,117 @@ describe('TasksController (e2e)', () => {
         code: 'NOT_FOUND',
         message: 'Project not found',
         details: null,
+      },
+    });
+  });
+
+  it('returns 403 when a user tries to load tasks from a project outside their scope', async () => {
+    mockPrismaService.project.findUnique.mockResolvedValue({
+      id: 'project-1',
+      ownerId: 'owner-1',
+    });
+    mockPrismaService.projectMember.findUnique.mockResolvedValue(null);
+
+    await expect(
+      executeTaskRoute({
+        controller,
+        jwtAuthGuard,
+        resourceAccessGuard,
+        method: 'listProjectTasks',
+        request: createRequest({
+          authorization: 'Bearer outsider-token',
+          params: {
+            projectId: 'project-1',
+          },
+        }),
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'FORBIDDEN',
+        message: 'You do not have access to this project',
+      },
+    });
+  });
+
+  it('returns grouped task data for an accessible project member', async () => {
+    mockPrismaService.project.findUnique.mockResolvedValue({
+      id: 'project-1',
+      ownerId: 'owner-1',
+    });
+    mockPrismaService.projectMember.findUnique.mockResolvedValue({
+      id: 'membership-1',
+    });
+    mockPrismaService.task.findMany.mockResolvedValue([
+      {
+        id: 'task-done',
+        projectId: 'project-1',
+        title: 'Publish smoke notes',
+        description: null,
+        status: TaskStatus.DONE,
+        position: null,
+        assigneeId: null,
+        dueDate: null,
+        createdAt: new Date('2026-04-02T09:00:00.000Z'),
+        updatedAt: new Date('2026-04-02T09:00:00.000Z'),
+      },
+      {
+        id: 'task-todo',
+        projectId: 'project-1',
+        title: 'Draft API envelope',
+        description: null,
+        status: TaskStatus.TODO,
+        position: 1,
+        assigneeId: null,
+        dueDate: null,
+        createdAt: new Date('2026-04-01T09:00:00.000Z'),
+        updatedAt: new Date('2026-04-01T09:00:00.000Z'),
+      },
+    ]);
+
+    await expect(
+      executeTaskRoute({
+        controller,
+        jwtAuthGuard,
+        resourceAccessGuard,
+        method: 'listProjectTasks',
+        request: createRequest({
+          authorization: 'Bearer member-token',
+          params: {
+            projectId: 'project-1',
+          },
+        }),
+      }),
+    ).resolves.toEqual({
+      taskGroups: {
+        TODO: [
+          {
+            id: 'task-todo',
+            projectId: 'project-1',
+            title: 'Draft API envelope',
+            description: null,
+            status: TaskStatus.TODO,
+            position: 1,
+            assigneeId: null,
+            dueDate: null,
+            createdAt: '2026-04-01T09:00:00.000Z',
+            updatedAt: '2026-04-01T09:00:00.000Z',
+          },
+        ],
+        IN_PROGRESS: [],
+        DONE: [
+          {
+            id: 'task-done',
+            projectId: 'project-1',
+            title: 'Publish smoke notes',
+            description: null,
+            status: TaskStatus.DONE,
+            position: null,
+            assigneeId: null,
+            dueDate: null,
+            createdAt: '2026-04-02T09:00:00.000Z',
+            updatedAt: '2026-04-02T09:00:00.000Z',
+          },
+        ],
       },
     });
   });
@@ -386,7 +496,106 @@ describe('TasksController (e2e)', () => {
     });
   });
 
-  it('allows admins to bypass project membership when loading tasks', async () => {
+  it('allows members to patch task status inside accessible projects', async () => {
+    mockPrismaService.task.findUnique.mockResolvedValue({
+      id: 'task-1',
+      projectId: 'project-1',
+      project: {
+        ownerId: 'owner-1',
+      },
+    });
+    mockPrismaService.projectMember.findUnique.mockResolvedValue({
+      id: 'membership-1',
+    });
+    mockPrismaService.task.update.mockResolvedValue({
+      id: 'task-1',
+      projectId: 'project-1',
+      title: 'Ship launch checklist',
+      description: null,
+      status: TaskStatus.DONE,
+      position: null,
+      assigneeId: null,
+      dueDate: null,
+      createdAt: new Date('2026-04-01T09:00:00.000Z'),
+      updatedAt: new Date('2026-04-06T09:00:00.000Z'),
+    });
+
+    await expect(
+      executeTaskRoute({
+        controller,
+        jwtAuthGuard,
+        resourceAccessGuard,
+        method: 'updateTaskStatus',
+        request: createRequest({
+          authorization: 'Bearer member-token',
+          params: {
+            taskId: 'task-1',
+          },
+        }),
+        body: {
+          status: TaskStatus.DONE,
+          position: null,
+        },
+      }),
+    ).resolves.toMatchObject({
+      id: 'task-1',
+      projectId: 'project-1',
+      status: TaskStatus.DONE,
+      position: null,
+    });
+  });
+
+  it('allows admins to bypass project membership when loading project tasks', async () => {
+    mockPrismaService.project.findUnique.mockResolvedValue({
+      id: 'project-1',
+      ownerId: 'owner-1',
+    });
+    mockPrismaService.task.findMany.mockResolvedValue([
+      {
+        id: 'task-1',
+        projectId: 'project-1',
+        title: 'Ship launch checklist',
+        description: null,
+        status: TaskStatus.TODO,
+        position: null,
+        assigneeId: null,
+        dueDate: null,
+        createdAt: new Date('2026-04-01T09:00:00.000Z'),
+        updatedAt: new Date('2026-04-01T09:00:00.000Z'),
+      },
+    ]);
+
+    await expect(
+      executeTaskRoute({
+        controller,
+        jwtAuthGuard,
+        resourceAccessGuard,
+        method: 'listProjectTasks',
+        request: createRequest({
+          authorization: 'Bearer admin-token',
+          params: {
+            projectId: 'project-1',
+          },
+        }),
+      }),
+    ).resolves.toMatchObject({
+      taskGroups: {
+        TODO: [
+          {
+            id: 'task-1',
+            projectId: 'project-1',
+            title: 'Ship launch checklist',
+          },
+        ],
+        IN_PROGRESS: [],
+        DONE: [],
+      },
+    });
+
+    expect(mockPrismaService.projectMember.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('allows admins to bypass project membership when loading a single task', async () => {
     mockPrismaService.task.findUnique
       .mockResolvedValueOnce({
         id: 'task-1',
@@ -442,13 +651,21 @@ async function executeTaskRoute({
   controller: TasksController;
   jwtAuthGuard: JwtAuthGuard;
   resourceAccessGuard: ResourceAccessGuard;
-  method: 'createTask' | 'getTask' | 'updateTask' | 'deleteTask';
+  method:
+    | 'listProjectTasks'
+    | 'createTask'
+    | 'getTask'
+    | 'updateTask'
+    | 'updateTaskStatus'
+    | 'deleteTask';
   request: AuthenticatedRequest;
   body?: {
     title?: string;
     description?: string | null;
     assigneeId?: string | null;
     dueDate?: string | null;
+    status?: TaskStatus;
+    position?: number | null;
   };
 }) {
   const controllerMethod = controller[method];
@@ -460,6 +677,10 @@ async function executeTaskRoute({
 
   await jwtAuthGuard.canActivate(executionContext);
   await resourceAccessGuard.canActivate(executionContext);
+
+  if (method === 'listProjectTasks') {
+    return controllerMethod.call(controller, request.params.projectId);
+  }
 
   if (method === 'createTask') {
     return controllerMethod.call(
@@ -475,6 +696,15 @@ async function executeTaskRoute({
   }
 
   if (method === 'updateTask') {
+    return controllerMethod.call(
+      controller,
+      request.user,
+      request.params.taskId,
+      body,
+    );
+  }
+
+  if (method === 'updateTaskStatus') {
     return controllerMethod.call(
       controller,
       request.user,

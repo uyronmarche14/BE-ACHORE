@@ -1,11 +1,11 @@
 import { NotFoundException, Injectable } from '@nestjs/common';
 import { ProjectMemberRole } from '@prisma/client';
+import { groupTaskRecordsByStatus } from '../../../common/utils/task-groups.util';
 import { PrismaService } from '../../../database/prisma.service';
 import type { AuthUserResponse } from '../../auth/types/auth-response.type';
 import type { CreateProjectDto } from '../dto/create-project.dto';
 import type { UpdateProjectDto } from '../dto/update-project.dto';
 import {
-  createEmptyProjectTaskGroupRecords,
   mapDeleteProjectResponse,
   mapProjectDetailResponse,
   mapProjectListResponse,
@@ -15,10 +15,8 @@ import type {
   DeleteProjectResponse,
   ProjectDetailMemberRecord,
   ProjectDetailResponse,
-  ProjectDetailTaskRecord,
   ProjectListResponse,
   ProjectSummaryResponse,
-  ProjectTaskGroupsRecord,
 } from '../types/project-response.type';
 
 @Injectable()
@@ -102,7 +100,7 @@ export class ProjectsService {
       name: project.name,
       description: project.description,
       members: [...project.members].sort(compareProjectMembers),
-      taskGroups: this.groupProjectTasks(project.tasks),
+      taskGroups: groupTaskRecordsByStatus(project.tasks),
     });
   }
 
@@ -158,19 +156,6 @@ export class ProjectsService {
 
     return mapDeleteProjectResponse();
   }
-
-  private groupProjectTasks(
-    tasks: ProjectDetailTaskRecord[],
-  ): ProjectTaskGroupsRecord {
-    const taskGroups = createEmptyProjectTaskGroupRecords();
-
-    for (const task of [...tasks].sort(compareProjectTasks)) {
-      taskGroups[task.status].push(task);
-    }
-
-    return taskGroups;
-  }
-
   private createProjectNotFoundException() {
     return new NotFoundException({
       code: 'NOT_FOUND',
@@ -232,23 +217,6 @@ function compareProjectMembers(
   }
 
   return left.user.name.localeCompare(right.user.name);
-}
-
-function compareProjectTasks(
-  left: ProjectDetailTaskRecord,
-  right: ProjectDetailTaskRecord,
-) {
-  if (left.position !== null && right.position !== null) {
-    if (left.position !== right.position) {
-      return left.position - right.position;
-    }
-  } else if (left.position !== null) {
-    return -1;
-  } else if (right.position !== null) {
-    return 1;
-  }
-
-  return left.createdAt.getTime() - right.createdAt.getTime();
 }
 
 function isPrismaRecordNotFoundError(error: unknown) {
