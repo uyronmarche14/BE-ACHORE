@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../src/database/prisma.service';
 import { AuthService } from '../src/modules/auth/service/auth.service';
 import { ProjectsService } from '../src/modules/projects/service/projects.service';
+import { MailService } from '../src/modules/mail/service/mail.service';
 import { SeedController } from '../src/modules/seed/controller/seed.controller';
 import {
   DEMO_PASSWORD,
@@ -100,6 +101,9 @@ describe('Seed demo flow (e2e)', () => {
   let projectsService: ProjectsService;
   let tasksService: TasksService;
   let taskLogsService: TaskLogsService;
+  const mockMailService = {
+    sendMail: jest.fn().mockResolvedValue(undefined),
+  };
 
   const mockPrismaService = {
     $transaction: jest.fn(),
@@ -108,6 +112,12 @@ describe('Seed demo flow (e2e)', () => {
       deleteMany: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn(),
+    },
+    emailVerificationToken: {
+      deleteMany: jest.fn(),
+    },
+    projectInvite: {
+      deleteMany: jest.fn(),
     },
     user: {
       createMany: jest.fn(),
@@ -142,6 +152,12 @@ describe('Seed demo flow (e2e)', () => {
       deleteMany: jest.Mock;
       findMany: jest.Mock;
       update: jest.Mock;
+    };
+    emailVerificationToken: {
+      deleteMany: jest.Mock;
+    };
+    projectInvite: {
+      deleteMany: jest.Mock;
     };
     user: {
       createMany: jest.Mock;
@@ -256,6 +272,12 @@ describe('Seed demo flow (e2e)', () => {
         return { count: 0 };
       },
     );
+    mockPrismaService.emailVerificationToken.deleteMany.mockResolvedValue({
+      count: 0,
+    });
+    mockPrismaService.projectInvite.deleteMany.mockResolvedValue({
+      count: 0,
+    });
     mockPrismaService.refreshToken.findMany.mockImplementation(
       ({ where }: { where: { userId: string; revokedAt: null } }) =>
         refreshTokens.filter(
@@ -421,7 +443,10 @@ describe('Seed demo flow (e2e)', () => {
       ({ where }: { where: { projectId: string } }) =>
         tasks.filter((task) => task.projectId === where.projectId),
     );
-    mockPrismaService.task.findUnique.mockResolvedValue(null);
+    mockPrismaService.task.findUnique.mockImplementation(
+      ({ where }: { where: { id: string } }) =>
+        tasks.find((task) => task.id === where.id) ?? null,
+    );
     mockPrismaService.taskLog.create.mockImplementation(
       ({ data }: { data: Omit<TaskLogRecord, 'id'> }) => {
         const taskLog = {
@@ -430,8 +455,8 @@ describe('Seed demo flow (e2e)', () => {
           actorId: data.actorId,
           eventType: data.eventType,
           fieldName: data.fieldName,
-          oldValue: data.oldValue === Prisma.JsonNull ? null : data.oldValue,
-          newValue: data.newValue === Prisma.JsonNull ? null : data.newValue,
+          oldValue: normalizeJsonValue(data.oldValue),
+          newValue: normalizeJsonValue(data.newValue),
           summary: data.summary,
           createdAt: data.createdAt,
         };
@@ -489,6 +514,10 @@ describe('Seed demo flow (e2e)', () => {
           provide: JwtService,
           useValue: jwtService,
         },
+        {
+          provide: MailService,
+          useValue: mockMailService,
+        },
       ],
     }).compile();
 
@@ -540,6 +569,7 @@ describe('Seed demo flow (e2e)', () => {
     );
     const taskLogTimeline = await taskLogsService.listTaskLogs(
       'demo-task-narrative',
+      {},
     );
 
     expect(projectList.items).toHaveLength(2);
@@ -558,8 +588,16 @@ describe('Seed demo flow (e2e)', () => {
     );
     expect(
       taskLogs.filter((taskLog) =>
-        DEMO_SEED_IDS.taskIds.includes(taskLog.taskId),
+        (DEMO_SEED_IDS.taskIds as readonly string[]).includes(taskLog.taskId),
       ),
     ).toHaveLength(5);
   });
 });
+
+function normalizeJsonValue(value: unknown): Prisma.JsonValue {
+  if (value === Prisma.JsonNull || value === null) {
+    return null;
+  }
+
+  return value as Prisma.JsonValue;
+}

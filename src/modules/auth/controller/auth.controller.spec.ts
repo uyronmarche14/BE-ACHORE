@@ -27,15 +27,9 @@ describe('AuthController', () => {
           provide: AuthService,
           useValue: {
             signup: jest.fn().mockResolvedValue({
-              user: {
-                id: 'user-1',
-                name: 'Jane Doe',
-                email: 'jane@example.com',
-                role: 'MEMBER',
-              },
-              accessToken: 'access-token',
-              refreshToken: 'refresh-token',
-              refreshTokenExpiresAt: new Date('2026-04-08T00:00:00.000Z'),
+              message: 'Check your email to verify your account',
+              email: 'jane@example.com',
+              emailVerificationRequired: true,
             }),
             login: jest.fn().mockResolvedValue({
               user: {
@@ -43,6 +37,7 @@ describe('AuthController', () => {
                 name: 'Jane Doe',
                 email: 'jane@example.com',
                 role: 'MEMBER',
+                emailVerifiedAt: '2026-04-01T00:00:00.000Z',
               },
               accessToken: 'next-access-token',
               refreshToken: 'next-refresh-token',
@@ -107,17 +102,12 @@ describe('AuthController', () => {
     );
 
     expect(result).toEqual({
-      user: {
-        id: 'user-1',
-        name: 'Jane Doe',
-        email: 'jane@example.com',
-        role: 'MEMBER',
-      },
-      accessToken: 'access-token',
+      message: 'Check your email to verify your account',
+      email: 'jane@example.com',
+      emailVerificationRequired: true,
     });
-    expect(response.cookie).toHaveBeenCalledWith(
+    expect(response.clearCookie).toHaveBeenCalledWith(
       'archon_refresh_token',
-      'refresh-token',
       expect.objectContaining({
         httpOnly: true,
         secure: false,
@@ -144,6 +134,7 @@ describe('AuthController', () => {
         name: 'Jane Doe',
         email: 'jane@example.com',
         role: 'MEMBER',
+        emailVerifiedAt: '2026-04-01T00:00:00.000Z',
       },
       accessToken: 'next-access-token',
     });
@@ -261,6 +252,7 @@ describe('AuthController', () => {
       name: 'Jane Doe',
       email: 'jane@example.com',
       role: 'MEMBER',
+      emailVerifiedAt: '2026-04-01T00:00:00.000Z',
     });
 
     expect(result).toEqual({
@@ -269,6 +261,7 @@ describe('AuthController', () => {
         name: 'Jane Doe',
         email: 'jane@example.com',
         role: 'MEMBER',
+        emailVerifiedAt: '2026-04-01T00:00:00.000Z',
       },
     });
   });
@@ -293,5 +286,5 @@ function createExecutionContext(
       getResponse: () => undefined,
       getNext: () => undefined,
     }),
-  } as ExecutionContext;
+  } as unknown as ExecutionContext;
 }

@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   HttpException,
   HttpStatus,
+  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -57,5 +58,11 @@ export function createRateLimitedException(options: ApiExceptionOptions) {
   return new HttpException(
     buildApiErrorPayload('RATE_LIMITED', options),
     HttpStatus.TOO_MANY_REQUESTS,
+  );
+}
+
+export function createInternalException(options: ApiExceptionOptions) {
+  return new InternalServerErrorException(
+    buildApiErrorPayload('INTERNAL_ERROR', options),
   );
 }

@@ -30,6 +30,9 @@ export type TaskLogEntryResponse = {
 
 export type TaskLogsResponse = {
   items: TaskLogEntryResponse[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
 };
 
 export type TaskLogRecord = {
@@ -44,4 +47,11 @@ export type TaskLogRecord = {
     id: string;
     name: string;
   };
+};
+
+export type PaginatedTaskLogRecords = {
+  items: TaskLogRecord[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
 };

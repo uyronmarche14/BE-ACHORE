@@ -95,15 +95,9 @@ describe('Auth rate limiting (e2e)', () => {
   beforeEach(async () => {
     mockAuthService = {
       signup: jest.fn().mockResolvedValue({
-        user: {
-          id: 'user-1',
-          name: 'Jane Doe',
-          email: 'jane@example.com',
-          role: 'MEMBER',
-        },
-        accessToken: 'access-token',
-        refreshToken: 'refresh-token',
-        refreshTokenExpiresAt: new Date('2026-04-08T00:00:00.000Z'),
+        message: 'Check your email to verify your account',
+        email: 'jane@example.com',
+        emailVerificationRequired: true,
       }),
       login: jest.fn().mockResolvedValue({
         user: {
@@ -111,6 +105,7 @@ describe('Auth rate limiting (e2e)', () => {
           name: 'Jane Doe',
           email: 'jane@example.com',
           role: 'MEMBER',
+          emailVerifiedAt: '2026-04-01T00:00:00.000Z',
         },
         accessToken: 'next-access-token',
         refreshToken: 'next-refresh-token',
@@ -167,13 +162,9 @@ describe('Auth rate limiting (e2e)', () => {
           clientIp: '203.0.113.10',
         }),
       ).resolves.toEqual({
-        user: {
-          id: 'user-1',
-          name: 'Jane Doe',
-          email: 'jane@example.com',
-          role: 'MEMBER',
-        },
-        accessToken: 'access-token',
+        message: 'Check your email to verify your account',
+        email: 'jane@example.com',
+        emailVerificationRequired: true,
       });
     }
 
@@ -275,19 +266,36 @@ async function executeRateLimitedRoute({
 }) {
   const request = createRequest(clientIp);
   const response = createPassthroughResponse();
-  const controllerMethod = controller[method];
+  const controllerMethod =
+    method === 'signup'
+      ? (Reflect.get(AuthRateLimitProbeController.prototype, 'signup') as (
+          ...args: unknown[]
+        ) => unknown)
+      : method === 'login'
+        ? (Reflect.get(AuthRateLimitProbeController.prototype, 'login') as (
+            ...args: unknown[]
+          ) => unknown)
+        : (Reflect.get(AuthRateLimitProbeController.prototype, 'refresh') as (
+            ...args: unknown[]
+          ) => unknown);
   const executionContext = createExecutionContext(
-    controller.constructor,
+    AuthRateLimitProbeController,
     controllerMethod,
     request,
     response,
   );
 
-  authRateLimitGuard.canActivate(executionContext);
+  await Promise.resolve(authRateLimitGuard.canActivate(executionContext));
 
-  return controllerMethod.call(controller) as ReturnType<
-    AuthRateLimitProbeController[typeof method]
-  >;
+  if (method === 'signup') {
+    return AuthRateLimitProbeController.prototype.signup.call(controller);
+  }
+
+  if (method === 'login') {
+    return AuthRateLimitProbeController.prototype.login.call(controller);
+  }
+
+  return AuthRateLimitProbeController.prototype.refresh.call(controller);
 }
 
 function createRequest(clientIp: string): RequestWithContext & {
@@ -303,7 +311,7 @@ function createRequest(clientIp: string): RequestWithContext & {
     socket: {
       remoteAddress: clientIp,
     },
-  } as RequestWithContext & {
+  } as unknown as RequestWithContext & {
     headers: Record<string, string>;
     ip: string;
   };
@@ -337,7 +345,7 @@ function createExecutionContext(
       getResponse: () => response,
       getNext: () => undefined,
     }),
-  } as ExecutionContext;
+  } as unknown as ExecutionContext;
 }
 
 function createArgumentsHost(
@@ -353,5 +361,5 @@ function createArgumentsHost(
       getResponse: () => response,
       getNext: () => undefined,
     }),
-  } as ArgumentsHost;
+  } as unknown as ArgumentsHost;
 }

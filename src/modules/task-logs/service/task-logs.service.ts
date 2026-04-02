@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, TaskLogEventType, TaskStatus } from '@prisma/client';
+import { createNotFoundException } from '../../../common/utils/api-exception.util';
 import { PrismaService } from '../../../database/prisma.service';
 import { mapTaskLogsResponse } from '../mapper/task-logs.mapper';
 import type {
+  PaginatedTaskLogRecords,
   TaskLogAssigneeValue,
   TaskLogsResponse,
   TaskLogValue,
@@ -44,7 +46,18 @@ export type TaskLogFieldChange = {
 export class TaskLogsService {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async listTaskLogs(taskId: string): Promise<TaskLogsResponse> {
+  async listTaskLogs(
+    taskId: string,
+    options?: {
+      page?: number;
+      pageSize?: number;
+    },
+  ): Promise<TaskLogsResponse> {
+    await this.assertTaskExists(taskId);
+
+    const page = options?.page ?? 1;
+    const pageSize = options?.pageSize ?? 10;
+    const offset = (page - 1) * pageSize;
     const taskLogs = await this.prismaService.taskLog.findMany({
       where: {
         taskId,
@@ -52,10 +65,19 @@ export class TaskLogsService {
       orderBy: {
         createdAt: 'desc',
       },
+      skip: offset,
+      take: pageSize + 1,
       select: taskLogResponseSelect,
     });
 
-    return mapTaskLogsResponse(taskLogs);
+    const paginatedTaskLogs: PaginatedTaskLogRecords = {
+      items: taskLogs.slice(0, pageSize),
+      page,
+      pageSize,
+      hasMore: taskLogs.length > pageSize,
+    };
+
+    return mapTaskLogsResponse(paginatedTaskLogs);
   }
 
   async createTaskCreatedLog(
@@ -157,6 +179,23 @@ export class TaskLogsService {
       id: user.id,
       name: user.name,
     };
+  }
+
+  private async assertTaskExists(taskId: string) {
+    const task = await this.prismaService.task.findUnique({
+      where: {
+        id: taskId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!task) {
+      throw createNotFoundException({
+        message: 'Task not found',
+      });
+    }
   }
 }
 

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
+import { MailModule } from '../mail/mail.module';
 import { AuthController } from './controller/auth.controller';
 import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -10,7 +11,7 @@ import { AuthService } from './service/auth.service';
 import { ResourceAuthorizationService } from './service/resource-authorization.service';
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [JwtModule.register({}), MailModule],
   controllers: [AuthController],
   providers: [
     Reflector,

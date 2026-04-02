@@ -17,6 +17,9 @@ import { ResourceAuthorizationService } from '../src/modules/auth/service/resour
 import { TaskLogsService } from '../src/modules/task-logs/service/task-logs.service';
 import type { AuthenticatedRequest } from '../src/modules/auth/types/authenticated-request.type';
 import { TasksController } from '../src/modules/tasks/controller/tasks.controller';
+import { CreateTaskDto } from '../src/modules/tasks/dto/create-task.dto';
+import { UpdateTaskDto } from '../src/modules/tasks/dto/update-task.dto';
+import { UpdateTaskStatusDto } from '../src/modules/tasks/dto/update-task-status.dto';
 import { TasksService } from '../src/modules/tasks/service/tasks.service';
 
 describe('TasksController (e2e)', () => {
@@ -82,6 +85,7 @@ describe('TasksController (e2e)', () => {
             name: 'Owner User',
             email: 'owner@example.com',
             role: 'MEMBER',
+            emailVerifiedAt: '2026-04-01T00:00:00.000Z',
           });
         }
 
@@ -91,6 +95,7 @@ describe('TasksController (e2e)', () => {
             name: 'Member User',
             email: 'member@example.com',
             role: 'MEMBER',
+            emailVerifiedAt: '2026-04-01T00:00:00.000Z',
           });
         }
 
@@ -100,6 +105,7 @@ describe('TasksController (e2e)', () => {
             name: 'Outsider User',
             email: 'outsider@example.com',
             role: 'MEMBER',
+            emailVerifiedAt: '2026-04-01T00:00:00.000Z',
           });
         }
 
@@ -108,6 +114,7 @@ describe('TasksController (e2e)', () => {
           name: 'Admin User',
           email: 'admin@example.com',
           role: 'ADMIN',
+          emailVerifiedAt: '2026-04-01T00:00:00.000Z',
         });
       },
     );
@@ -693,10 +700,33 @@ async function executeTaskRoute({
     position?: number | null;
   };
 }) {
-  const controllerMethod = controller[method];
+  const controllerMethod =
+    method === 'listProjectTasks'
+      ? (Reflect.get(TasksController.prototype, 'listProjectTasks') as (
+          ...args: unknown[]
+        ) => unknown)
+      : method === 'createTask'
+        ? (Reflect.get(TasksController.prototype, 'createTask') as (
+            ...args: unknown[]
+          ) => unknown)
+        : method === 'getTask'
+          ? (Reflect.get(TasksController.prototype, 'getTask') as (
+              ...args: unknown[]
+            ) => unknown)
+          : method === 'updateTask'
+            ? (Reflect.get(TasksController.prototype, 'updateTask') as (
+                ...args: unknown[]
+              ) => unknown)
+            : method === 'updateTaskStatus'
+              ? (Reflect.get(TasksController.prototype, 'updateTaskStatus') as (
+                  ...args: unknown[]
+                ) => unknown)
+              : (Reflect.get(TasksController.prototype, 'deleteTask') as (
+                  ...args: unknown[]
+                ) => unknown);
   const executionContext = createExecutionContext(
-    controller.constructor as typeof TasksController,
-    controllerMethod as (...args: unknown[]) => unknown,
+    TasksController,
+    controllerMethod,
     request,
   );
 
@@ -704,43 +734,50 @@ async function executeTaskRoute({
   await resourceAccessGuard.canActivate(executionContext);
 
   if (method === 'listProjectTasks') {
-    return controllerMethod.call(controller, request.params.projectId);
+    return TasksController.prototype.listProjectTasks.call(
+      controller,
+      request.params.projectId,
+    );
   }
 
   if (method === 'createTask') {
-    return controllerMethod.call(
+    return TasksController.prototype.createTask.call(
       controller,
-      request.user,
-      request.params.projectId,
-      body,
+      request.user!,
+      request.params.projectId as string,
+      body as CreateTaskDto,
     );
   }
 
   if (method === 'getTask') {
-    return controllerMethod.call(controller, request.params.taskId);
+    return TasksController.prototype.getTask.call(
+      controller,
+      request.params.taskId,
+    );
   }
 
   if (method === 'updateTask') {
-    return controllerMethod.call(
+    return TasksController.prototype.updateTask.call(
       controller,
-      request.user,
-      request.params.taskId,
-      body,
+      request.user!,
+      request.params.taskId as string,
+      body as UpdateTaskDto,
     );
   }
 
   if (method === 'updateTaskStatus') {
-    return controllerMethod.call(
+    return TasksController.prototype.updateTaskStatus.call(
       controller,
-      request.user,
-      request.params.taskId,
-      body,
+      request.user!,
+      request.params.taskId as string,
+      body as UpdateTaskStatusDto,
     );
   }
 
-  return controllerMethod.call(controller, request.params.taskId) as ReturnType<
-    TasksController['deleteTask']
-  >;
+  return TasksController.prototype.deleteTask.call(
+    controller,
+    request.params.taskId,
+  );
 }
 
 function createExecutionContext(
@@ -756,7 +793,7 @@ function createExecutionContext(
       getResponse: () => undefined,
       getNext: () => undefined,
     }),
-  } as ExecutionContext;
+  } as unknown as ExecutionContext;
 }
 
 function createRequest({
@@ -796,5 +833,5 @@ function createArgumentsHost(
       getResponse: () => response,
       getNext: () => undefined,
     }),
-  } as ArgumentsHost;
+  } as unknown as ArgumentsHost;
 }

@@ -74,6 +74,7 @@ describe('ProjectsController (e2e)', () => {
             name: 'Owner User',
             email: 'owner@example.com',
             role: 'MEMBER',
+            emailVerifiedAt: '2026-04-01T00:00:00.000Z',
           });
         }
 
@@ -83,6 +84,7 @@ describe('ProjectsController (e2e)', () => {
             name: 'Member User',
             email: 'member@example.com',
             role: 'MEMBER',
+            emailVerifiedAt: '2026-04-01T00:00:00.000Z',
           });
         }
 
@@ -91,6 +93,7 @@ describe('ProjectsController (e2e)', () => {
           name: 'Admin User',
           email: 'admin@example.com',
           role: 'ADMIN',
+          emailVerifiedAt: '2026-04-01T00:00:00.000Z',
         });
       },
     );
@@ -305,10 +308,21 @@ async function executeProjectRoute({
     description?: string | null;
   };
 }) {
-  const controllerMethod = controller[method];
+  const controllerMethod =
+    method === 'getProjectDetail'
+      ? (Reflect.get(ProjectsController.prototype, 'getProjectDetail') as (
+          ...args: unknown[]
+        ) => unknown)
+      : method === 'updateProject'
+        ? (Reflect.get(ProjectsController.prototype, 'updateProject') as (
+            ...args: unknown[]
+          ) => unknown)
+        : (Reflect.get(ProjectsController.prototype, 'deleteProject') as (
+            ...args: unknown[]
+          ) => unknown);
   const executionContext = createExecutionContext(
-    controller.constructor as typeof ProjectsController,
-    controllerMethod as (...args: unknown[]) => unknown,
+    ProjectsController,
+    controllerMethod,
     request,
   );
 
@@ -316,11 +330,14 @@ async function executeProjectRoute({
   await resourceAccessGuard.canActivate(executionContext);
 
   if (method === 'getProjectDetail') {
-    return controllerMethod.call(controller, request.params.projectId);
+    return ProjectsController.prototype.getProjectDetail.call(
+      controller,
+      request.params.projectId,
+    );
   }
 
   if (method === 'updateProject') {
-    return controllerMethod.call(
+    return ProjectsController.prototype.updateProject.call(
       controller,
       request.user,
       request.params.projectId,
@@ -328,10 +345,10 @@ async function executeProjectRoute({
     );
   }
 
-  return controllerMethod.call(
+  return ProjectsController.prototype.deleteProject.call(
     controller,
     request.params.projectId,
-  ) as ReturnType<ProjectsController['deleteProject']>;
+  );
 }
 
 function createExecutionContext(
@@ -347,7 +364,7 @@ function createExecutionContext(
       getResponse: () => undefined,
       getNext: () => undefined,
     }),
-  } as ExecutionContext;
+  } as unknown as ExecutionContext;
 }
 
 function createRequest({
@@ -387,5 +404,5 @@ function createArgumentsHost(
       getResponse: () => response,
       getNext: () => undefined,
     }),
-  } as ArgumentsHost;
+  } as unknown as ArgumentsHost;
 }

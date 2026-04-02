@@ -6,6 +6,9 @@ import { TaskLogsService } from './task-logs.service';
 
 describe('TaskLogsService', () => {
   const mockPrismaService = {
+    task: {
+      findUnique: jest.fn(),
+    },
     taskLog: {
       create: jest.fn(),
       findMany: jest.fn(),
@@ -14,6 +17,9 @@ describe('TaskLogsService', () => {
       findUnique: jest.fn(),
     },
   } as unknown as PrismaService & {
+    task: {
+      findUnique: jest.Mock;
+    };
     taskLog: {
       create: jest.Mock;
       findMany: jest.Mock;
@@ -27,9 +33,13 @@ describe('TaskLogsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPrismaService.task.findUnique.mockReset();
     mockPrismaService.taskLog.create.mockReset();
     mockPrismaService.taskLog.findMany.mockReset();
     mockPrismaService.user.findUnique.mockReset();
+    mockPrismaService.task.findUnique.mockResolvedValue({
+      id: 'task-1',
+    });
     taskLogsService = new TaskLogsService(mockPrismaService);
   });
 
@@ -92,6 +102,9 @@ describe('TaskLogsService', () => {
           createdAt: '2026-04-02T09:00:00.000Z',
         },
       ],
+      page: 1,
+      pageSize: 10,
+      hasMore: false,
     });
     expect(mockPrismaService.taskLog.findMany).toHaveBeenCalledWith({
       where: {
@@ -100,6 +113,8 @@ describe('TaskLogsService', () => {
       orderBy: {
         createdAt: 'desc',
       },
+      skip: 0,
+      take: 11,
       select: expect.any(Object),
     });
   });
@@ -166,6 +181,9 @@ describe('TaskLogsService', () => {
 
     await expect(taskLogsService.listTaskLogs('task-1')).resolves.toEqual({
       items: [],
+      page: 1,
+      pageSize: 10,
+      hasMore: false,
     });
   });
 });

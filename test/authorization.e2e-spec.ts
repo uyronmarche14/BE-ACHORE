@@ -131,6 +131,7 @@ describe('Authorization guards (e2e)', () => {
       name: 'Member User',
       email: 'member@example.com',
       role: 'MEMBER',
+      emailVerifiedAt: '2026-04-01T00:00:00.000Z',
     });
     mockPrismaService.project.findUnique.mockResolvedValue({
       id: 'project-1',
@@ -158,6 +159,7 @@ describe('Authorization guards (e2e)', () => {
       name: 'Member User',
       email: 'member@example.com',
       role: 'MEMBER',
+      emailVerifiedAt: '2026-04-01T00:00:00.000Z',
     });
     mockPrismaService.project.findUnique.mockResolvedValue(null);
 
@@ -181,6 +183,7 @@ describe('Authorization guards (e2e)', () => {
       name: 'Member User',
       email: 'member@example.com',
       role: 'MEMBER',
+      emailVerifiedAt: '2026-04-01T00:00:00.000Z',
     });
     mockPrismaService.project.findUnique.mockResolvedValue({
       id: 'project-1',
@@ -207,6 +210,7 @@ describe('Authorization guards (e2e)', () => {
       name: 'Member User',
       email: 'member@example.com',
       role: 'MEMBER',
+      emailVerifiedAt: '2026-04-01T00:00:00.000Z',
     });
     mockPrismaService.project.findUnique.mockResolvedValue({
       id: 'project-1',
@@ -238,6 +242,7 @@ describe('Authorization guards (e2e)', () => {
       name: 'Member User',
       email: 'member@example.com',
       role: 'MEMBER',
+      emailVerifiedAt: '2026-04-01T00:00:00.000Z',
     });
     mockPrismaService.task.findUnique.mockResolvedValue({
       id: 'task-1',
@@ -296,9 +301,21 @@ async function executeGuardedRoute({
       : {},
   } as AuthenticatedRequest;
 
-  const controllerMethod = controller[method];
+  const controllerMethod =
+    method === 'getProject'
+      ? (Reflect.get(AuthorizationProbeController.prototype, 'getProject') as (
+          ...args: unknown[]
+        ) => unknown)
+      : method === 'updateProject'
+        ? (Reflect.get(
+            AuthorizationProbeController.prototype,
+            'updateProject',
+          ) as (...args: unknown[]) => unknown)
+        : (Reflect.get(AuthorizationProbeController.prototype, 'getTask') as (
+            ...args: unknown[]
+          ) => unknown);
   const executionContext = createExecutionContext(
-    controller.constructor,
+    AuthorizationProbeController,
     controllerMethod,
     request,
   );
@@ -306,9 +323,7 @@ async function executeGuardedRoute({
   await jwtAuthGuard.canActivate(executionContext);
   await resourceAccessGuard.canActivate(executionContext);
 
-  return controllerMethod.call(controller, request) as ReturnType<
-    AuthorizationProbeController[typeof method]
-  >;
+  return controllerMethod.call(controller, request);
 }
 
 function createExecutionContext(
@@ -324,5 +339,5 @@ function createExecutionContext(
       getResponse: () => undefined,
       getNext: () => undefined,
     }),
-  } as ExecutionContext;
+  } as unknown as ExecutionContext;
 }

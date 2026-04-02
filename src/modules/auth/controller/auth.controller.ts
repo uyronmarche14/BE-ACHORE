@@ -18,8 +18,10 @@ import {
   mapCurrentUserResponse,
   mapLoginResponse,
   mapLogoutResponse,
+  mapResendVerificationResponse,
   mapRefreshResponse,
   mapSignupResponse,
+  mapVerifyEmailConfirmResponse,
 } from '../mapper/auth.mapper';
 import { SignupDto } from '../dto/signup.dto';
 import { AuthService } from '../service/auth.service';
@@ -28,8 +30,10 @@ import type {
   LoginResponse,
   LogoutResponse,
   RefreshAccessTokenResponse,
+  ResendVerificationResponse,
   SignupResponse,
   AuthUserResponse,
+  VerifyEmailConfirmResponse,
 } from '../types/auth-response.type';
 import { getCookieValue } from '../utils/auth-request.util';
 import {
@@ -37,6 +41,8 @@ import {
   getRefreshCookieName,
   setRefreshTokenCookie,
 } from '../utils/refresh-cookie.util';
+import { ResendVerificationDto } from '../dto/resend-verification.dto';
+import { VerifyEmailConfirmDto } from '../dto/verify-email-confirm.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -58,12 +64,7 @@ export class AuthController {
   ): Promise<SignupResponse> {
     const signupResult = await this.authService.signup(signupDto);
 
-    setRefreshTokenCookie(
-      response,
-      this.configService,
-      signupResult.refreshToken,
-      signupResult.refreshTokenExpiresAt,
-    );
+    clearRefreshTokenCookie(response, this.configService);
 
     return mapSignupResponse(signupResult);
   }
@@ -133,6 +134,36 @@ export class AuthController {
     clearRefreshTokenCookie(response, this.configService);
 
     return mapLogoutResponse();
+  }
+
+  @Post('verify-email/confirm')
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit({
+    key: 'verify-email-confirm',
+    limit: 10,
+    windowMs: 60_000,
+  })
+  confirmEmailVerification(
+    @Body() verifyEmailConfirmDto: VerifyEmailConfirmDto,
+  ): Promise<VerifyEmailConfirmResponse> {
+    return this.authService
+      .confirmEmailVerification(verifyEmailConfirmDto)
+      .then(mapVerifyEmailConfirmResponse);
+  }
+
+  @Post('verify-email/resend')
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit({
+    key: 'verify-email-resend',
+    limit: 5,
+    windowMs: 60_000,
+  })
+  resendEmailVerification(
+    @Body() resendVerificationDto: ResendVerificationDto,
+  ): Promise<ResendVerificationResponse> {
+    return this.authService
+      .resendEmailVerification(resendVerificationDto)
+      .then(mapResendVerificationResponse);
   }
 
   @Get('me')

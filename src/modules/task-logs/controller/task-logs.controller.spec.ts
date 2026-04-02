@@ -22,6 +22,9 @@ describe('TaskLogsController', () => {
           createdAt: '2026-04-02T09:00:00.000Z',
         },
       ],
+      page: 1,
+      pageSize: 10,
+      hasMore: false,
     }),
   } as unknown as jest.Mocked<TaskLogsService>;
 
@@ -32,8 +35,8 @@ describe('TaskLogsController', () => {
   });
 
   it('lists logs for the route task parameter', async () => {
-    await taskLogsController.listTaskLogs('task-1');
+    await taskLogsController.listTaskLogs('task-1', {});
 
-    expect(taskLogsService.listTaskLogs).toHaveBeenCalledWith('task-1');
+    expect(taskLogsService.listTaskLogs).toHaveBeenCalledWith('task-1', {});
   });
 });

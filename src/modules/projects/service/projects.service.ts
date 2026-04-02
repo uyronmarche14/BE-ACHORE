@@ -1,19 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { ProjectMemberRole } from '@prisma/client';
+import { Prisma, ProjectMemberRole } from '@prisma/client';
 import { createNotFoundException } from '../../../common/utils/api-exception.util';
 import { groupTaskRecordsByStatus } from '../../../common/utils/task-groups.util';
 import { PrismaService } from '../../../database/prisma.service';
 import type { AuthUserResponse } from '../../auth/types/auth-response.type';
 import type { CreateProjectDto } from '../dto/create-project.dto';
+import type { GetProjectActivityQueryDto } from '../dto/get-project-activity-query.dto';
 import type { UpdateProjectDto } from '../dto/update-project.dto';
 import {
   mapDeleteProjectResponse,
+  mapProjectActivityResponse,
   mapProjectDetailResponse,
   mapProjectListResponse,
   mapProjectSummaryResponse,
 } from '../mapper/projects.mapper';
 import type {
   DeleteProjectResponse,
+  ProjectActivityResponse,
   ProjectDetailMemberRecord,
   ProjectDetailResponse,
   ProjectListResponse,
@@ -157,10 +160,81 @@ export class ProjectsService {
 
     return mapDeleteProjectResponse();
   }
+
+  async getProjectActivity(
+    projectId: string,
+    query: GetProjectActivityQueryDto,
+  ): Promise<ProjectActivityResponse> {
+    await this.assertProjectExists(projectId);
+
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+    const offset = (page - 1) * pageSize;
+
+    const activityItems = await this.prismaService.taskLog.findMany({
+      where: {
+        task: {
+          projectId,
+        },
+        ...(query.eventType
+          ? {
+              eventType: query.eventType,
+            }
+          : {}),
+        ...(query.q
+          ? {
+              OR: [
+                {
+                  summary: {
+                    contains: query.q,
+                  },
+                },
+                {
+                  task: {
+                    title: {
+                      contains: query.q,
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      skip: offset,
+      take: pageSize + 1,
+      select: projectActivitySelect,
+    });
+
+    return mapProjectActivityResponse({
+      items: activityItems.slice(0, pageSize),
+      page,
+      pageSize,
+      hasMore: activityItems.length > pageSize,
+    });
+  }
+
   private createProjectNotFoundException() {
     return createNotFoundException({
       message: 'Project not found',
     });
+  }
+
+  private async assertProjectExists(projectId: string) {
+    const project = await this.prismaService.project.findUnique({
+      where: {
+        id: projectId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!project) {
+      throw this.createProjectNotFoundException();
+    }
   }
 }
 
@@ -206,6 +280,29 @@ const projectDetailSelect = {
     },
   },
 } satisfies Record<string, unknown>;
+
+const projectActivitySelect = {
+  id: true,
+  eventType: true,
+  fieldName: true,
+  oldValue: true,
+  newValue: true,
+  summary: true,
+  createdAt: true,
+  actor: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  task: {
+    select: {
+      id: true,
+      title: true,
+      status: true,
+    },
+  },
+} satisfies Prisma.TaskLogSelect;
 
 function compareProjectMembers(
   left: ProjectDetailMemberRecord,

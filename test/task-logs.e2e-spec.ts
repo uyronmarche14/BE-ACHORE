@@ -17,6 +17,9 @@ import type { AuthenticatedRequest } from '../src/modules/auth/types/authenticat
 import { TaskLogsController } from '../src/modules/task-logs/controller/task-logs.controller';
 import { TaskLogsService } from '../src/modules/task-logs/service/task-logs.service';
 import { TasksController } from '../src/modules/tasks/controller/tasks.controller';
+import { CreateTaskDto } from '../src/modules/tasks/dto/create-task.dto';
+import { UpdateTaskDto } from '../src/modules/tasks/dto/update-task.dto';
+import { UpdateTaskStatusDto } from '../src/modules/tasks/dto/update-task-status.dto';
 import { TasksService } from '../src/modules/tasks/service/tasks.service';
 
 describe('TaskLogsController (e2e)', () => {
@@ -115,6 +118,7 @@ describe('TaskLogsController (e2e)', () => {
             name: 'Owner User',
             email: 'owner@example.com',
             role: 'MEMBER',
+            emailVerifiedAt: '2026-04-01T00:00:00.000Z',
           });
         }
 
@@ -124,6 +128,7 @@ describe('TaskLogsController (e2e)', () => {
             name: 'Member User',
             email: 'member@example.com',
             role: 'MEMBER',
+            emailVerifiedAt: '2026-04-01T00:00:00.000Z',
           });
         }
 
@@ -133,6 +138,7 @@ describe('TaskLogsController (e2e)', () => {
             name: 'Outsider User',
             email: 'outsider@example.com',
             role: 'MEMBER',
+            emailVerifiedAt: '2026-04-01T00:00:00.000Z',
           });
         }
 
@@ -141,6 +147,7 @@ describe('TaskLogsController (e2e)', () => {
           name: 'Admin User',
           email: 'admin@example.com',
           role: 'ADMIN',
+          emailVerifiedAt: '2026-04-01T00:00:00.000Z',
         });
       },
     );
@@ -442,6 +449,9 @@ describe('TaskLogsController (e2e)', () => {
       }),
     ).resolves.toEqual({
       items: [],
+      page: 1,
+      pageSize: 10,
+      hasMore: false,
     });
   });
 
@@ -527,6 +537,9 @@ describe('TaskLogsController (e2e)', () => {
           fieldName: 'title',
         }),
       ],
+      page: 1,
+      pageSize: 10,
+      hasMore: false,
     });
   });
 });
@@ -553,10 +566,21 @@ async function executeTaskRoute({
     position?: number | null;
   };
 }) {
-  const controllerMethod = tasksController[method];
+  const controllerMethod =
+    method === 'createTask'
+      ? (Reflect.get(TasksController.prototype, 'createTask') as (
+          ...args: unknown[]
+        ) => unknown)
+      : method === 'updateTask'
+        ? (Reflect.get(TasksController.prototype, 'updateTask') as (
+            ...args: unknown[]
+          ) => unknown)
+        : (Reflect.get(TasksController.prototype, 'updateTaskStatus') as (
+            ...args: unknown[]
+          ) => unknown);
   const executionContext = createExecutionContext(
-    tasksController.constructor as typeof TasksController,
-    controllerMethod as (...args: unknown[]) => unknown,
+    TasksController,
+    controllerMethod,
     request,
   );
 
@@ -564,19 +588,28 @@ async function executeTaskRoute({
   await resourceAccessGuard.canActivate(executionContext);
 
   if (method === 'createTask') {
-    return controllerMethod.call(
+    return TasksController.prototype.createTask.call(
       tasksController,
-      request.user,
-      request.params.projectId,
-      body,
+      request.user!,
+      request.params.projectId as string,
+      body as CreateTaskDto,
     );
   }
 
-  return controllerMethod.call(
+  if (method === 'updateTask') {
+    return TasksController.prototype.updateTask.call(
+      tasksController,
+      request.user!,
+      request.params.taskId as string,
+      body as UpdateTaskDto,
+    );
+  }
+
+  return TasksController.prototype.updateTaskStatus.call(
     tasksController,
-    request.user,
-    request.params.taskId,
-    body,
+    request.user!,
+    request.params.taskId as string,
+    body as UpdateTaskStatusDto,
   );
 }
 
@@ -595,6 +628,7 @@ async function executeTaskLogsRoute({
   // eslint-disable-next-line @typescript-eslint/unbound-method
   const controllerHandler = TaskLogsController.prototype.listTaskLogs as (
     taskId: string,
+    query: Record<string, never>,
   ) => Promise<unknown>;
   const executionContext = createExecutionContext(
     taskLogsController.constructor as typeof TaskLogsController,
@@ -605,7 +639,7 @@ async function executeTaskLogsRoute({
   await jwtAuthGuard.canActivate(executionContext);
   await resourceAccessGuard.canActivate(executionContext);
 
-  return taskLogsController.listTaskLogs(request.params.taskId);
+  return taskLogsController.listTaskLogs(request.params.taskId as string, {});
 }
 
 function createExecutionContext(
@@ -621,7 +655,7 @@ function createExecutionContext(
       getResponse: () => undefined,
       getNext: () => undefined,
     }),
-  } as ExecutionContext;
+  } as unknown as ExecutionContext;
 }
 
 function createRequest({

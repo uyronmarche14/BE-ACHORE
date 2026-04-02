@@ -34,17 +34,35 @@ model User {
   email         String         @unique @db.VarChar(190)
   passwordHash  String         @map("password_hash") @db.VarChar(255)
   role          AppRole        @default(MEMBER)
+  emailVerifiedAt DateTime?    @map("email_verified_at") @db.DateTime(3)
   refreshTokens RefreshToken[]
+  emailVerificationTokens EmailVerificationToken[]
   projectsOwned Project[]      @relation("ProjectOwner")
   memberships   ProjectMember[]
   tasksAssigned Task[]         @relation("TaskAssignee")
   tasksCreated  Task[]         @relation("TaskCreatedBy")
   tasksUpdated  Task[]         @relation("TaskUpdatedBy")
   taskLogs      TaskLog[]      @relation("TaskLogActor")
+  sentProjectInvites ProjectInvite[] @relation("ProjectInviteSender")
   createdAt     DateTime       @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt     DateTime       @updatedAt @map("updated_at") @db.DateTime(3)
 
   @@map("users")
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(uuid()) @db.Char(36)
+  userId     String    @map("user_id") @db.Char(36)
+  tokenHash  String    @unique @map("token_hash") @db.Char(64)
+  expiresAt  DateTime  @map("expires_at") @db.DateTime(3)
+  consumedAt DateTime? @map("consumed_at") @db.DateTime(3)
+  redirectPath String? @map("redirect_path") @db.VarChar(255)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
 }
 
 model RefreshToken {
@@ -68,6 +86,7 @@ model Project {
   owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   members     ProjectMember[]
   tasks       Task[]
+  invites     ProjectInvite[]
   createdAt   DateTime        @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt   DateTime        @updatedAt @map("updated_at") @db.DateTime(3)
 
@@ -128,4 +147,23 @@ model TaskLog {
 
   @@index([taskId, createdAt])
   @@map("task_logs")
+}
+
+model ProjectInvite {
+  id         String            @id @default(uuid()) @db.Char(36)
+  projectId  String            @map("project_id") @db.Char(36)
+  invitedById String           @map("invited_by_id") @db.Char(36)
+  email      String            @db.VarChar(190)
+  role       ProjectMemberRole @default(MEMBER)
+  tokenHash  String            @unique @map("token_hash") @db.Char(64)
+  expiresAt  DateTime          @map("expires_at") @db.DateTime(3)
+  acceptedAt DateTime?         @map("accepted_at") @db.DateTime(3)
+  createdAt  DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  invitedBy  User              @relation("ProjectInviteSender", fields: [invitedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([projectId])
+  @@index([email])
+  @@index([projectId, email, acceptedAt, expiresAt])
+  @@map("project_invites")
 }

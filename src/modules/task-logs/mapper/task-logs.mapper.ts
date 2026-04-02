@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import type {
+  PaginatedTaskLogRecords,
   TaskLogEntryResponse,
   TaskLogRecord,
   TaskLogValue,
@@ -25,10 +26,13 @@ export function mapTaskLogEntryResponse(
 }
 
 export function mapTaskLogsResponse(
-  taskLogs: TaskLogRecord[],
+  taskLogs: PaginatedTaskLogRecords,
 ): TaskLogsResponse {
   return {
-    items: taskLogs.map((taskLog) => mapTaskLogEntryResponse(taskLog)),
+    items: taskLogs.items.map((taskLog) => mapTaskLogEntryResponse(taskLog)),
+    page: taskLogs.page,
+    pageSize: taskLogs.pageSize,
+    hasMore: taskLogs.hasMore,
   };
 }
 

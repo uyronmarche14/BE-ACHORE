@@ -73,6 +73,7 @@ describe('TasksController', () => {
     name: 'Jane Doe',
     email: 'jane@example.com',
     role: 'MEMBER' as const,
+    emailVerifiedAt: '2026-04-01T00:00:00.000Z',
   };
 
   beforeEach(() => {

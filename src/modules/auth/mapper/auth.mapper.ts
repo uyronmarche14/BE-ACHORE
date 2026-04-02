@@ -5,7 +5,9 @@ import type {
   LoginResponse,
   LogoutResponse,
   RefreshAccessTokenResponse,
+  ResendVerificationResponse,
   SignupResponse,
+  VerifyEmailConfirmResponse,
 } from '../types/auth-response.type';
 import type { User } from '@prisma/client';
 
@@ -15,6 +17,7 @@ export function mapUserToAuthUserResponse(user: User): AuthUserResponse {
     name: user.name,
     email: user.email,
     role: user.role,
+    emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
   };
 }
 
@@ -28,7 +31,11 @@ export function mapAuthSessionResponse(
 }
 
 export function mapSignupResponse(input: SignupResponse): SignupResponse {
-  return mapAuthSessionResponse(input);
+  return {
+    message: input.message,
+    email: input.email,
+    emailVerificationRequired: true,
+  };
 }
 
 export function mapLoginResponse(input: LoginResponse): LoginResponse {
@@ -54,5 +61,23 @@ export function mapCurrentUserResponse(
 export function mapLogoutResponse(): LogoutResponse {
   return {
     loggedOut: true,
+  };
+}
+
+export function mapVerifyEmailConfirmResponse(
+  input: VerifyEmailConfirmResponse,
+): VerifyEmailConfirmResponse {
+  return {
+    verified: true,
+    email: input.email,
+    redirectPath: input.redirectPath,
+  };
+}
+
+export function mapResendVerificationResponse(
+  input: ResendVerificationResponse,
+): ResendVerificationResponse {
+  return {
+    message: input.message,
   };
 }

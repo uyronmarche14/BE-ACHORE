@@ -90,6 +90,12 @@ describe('SeedService', () => {
     refreshToken: {
       deleteMany: jest.fn(),
     },
+    emailVerificationToken: {
+      deleteMany: jest.fn(),
+    },
+    projectInvite: {
+      deleteMany: jest.fn(),
+    },
     user: {
       createMany: jest.fn(),
       deleteMany: jest.fn(),
@@ -114,6 +120,12 @@ describe('SeedService', () => {
   } as unknown as PrismaService & {
     $transaction: jest.Mock;
     refreshToken: {
+      deleteMany: jest.Mock;
+    };
+    emailVerificationToken: {
+      deleteMany: jest.Mock;
+    };
+    projectInvite: {
       deleteMany: jest.Mock;
     };
     user: {
@@ -173,6 +185,12 @@ describe('SeedService', () => {
         return { count: 0 };
       },
     );
+    mockPrismaService.emailVerificationToken.deleteMany.mockResolvedValue({
+      count: 0,
+    });
+    mockPrismaService.projectInvite.deleteMany.mockResolvedValue({
+      count: 0,
+    });
     mockPrismaService.user.createMany.mockImplementation(
       ({ data }: { data: UserRecord[] }) => {
         users = [...users, ...data];
@@ -277,8 +295,8 @@ describe('SeedService', () => {
             actorId: data.actorId,
             eventType: data.eventType,
             fieldName: data.fieldName,
-            oldValue: data.oldValue === Prisma.JsonNull ? null : data.oldValue,
-            newValue: data.newValue === Prisma.JsonNull ? null : data.newValue,
+            oldValue: normalizeJsonValue(data.oldValue),
+            newValue: normalizeJsonValue(data.newValue),
             summary: data.summary,
             createdAt: data.createdAt,
           },
@@ -432,15 +450,19 @@ describe('SeedService', () => {
       expect.arrayContaining([expect.objectContaining({ id: 'other-task' })]),
     );
     expect(
-      users.filter((user) => DEMO_SEED_IDS.userIds.includes(user.id)),
-    ).toHaveLength(2);
-    expect(
-      projects.filter((project) =>
-        DEMO_SEED_IDS.projectIds.includes(project.id),
+      users.filter((user) =>
+        (DEMO_SEED_IDS.userIds as readonly string[]).includes(user.id),
       ),
     ).toHaveLength(2);
     expect(
-      tasks.filter((task) => DEMO_SEED_IDS.taskIds.includes(task.id)),
+      projects.filter((project) =>
+        (DEMO_SEED_IDS.projectIds as readonly string[]).includes(project.id),
+      ),
+    ).toHaveLength(2);
+    expect(
+      tasks.filter((task) =>
+        (DEMO_SEED_IDS.taskIds as readonly string[]).includes(task.id),
+      ),
     ).toHaveLength(6);
   });
 
@@ -460,3 +482,11 @@ describe('SeedService', () => {
     );
   });
 });
+
+function normalizeJsonValue(value: unknown): Prisma.JsonValue {
+  if (value === Prisma.JsonNull || value === null) {
+    return null;
+  }
+
+  return value as Prisma.JsonValue;
+}

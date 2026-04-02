@@ -11,6 +11,7 @@ describe('ProjectsService', () => {
     name: 'Owner User',
     email: 'owner@example.com',
     role: 'MEMBER' as const,
+    emailVerifiedAt: '2026-04-01T00:00:00.000Z',
   };
 
   const memberUser = {
@@ -18,6 +19,7 @@ describe('ProjectsService', () => {
     name: 'Member User',
     email: 'member@example.com',
     role: 'MEMBER' as const,
+    emailVerifiedAt: '2026-04-01T00:00:00.000Z',
   };
 
   const adminUser = {
@@ -25,6 +27,7 @@ describe('ProjectsService', () => {
     name: 'Admin User',
     email: 'admin@example.com',
     role: 'ADMIN' as const,
+    emailVerifiedAt: '2026-04-01T00:00:00.000Z',
   };
 
   const transactionClient = {

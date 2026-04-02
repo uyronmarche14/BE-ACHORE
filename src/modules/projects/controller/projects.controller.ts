@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
@@ -14,10 +15,12 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { ResourceAccessGuard } from '../../auth/guards/resource-access.guard';
 import type { AuthUserResponse } from '../../auth/types/auth-response.type';
 import { CreateProjectDto } from '../dto/create-project.dto';
+import { GetProjectActivityQueryDto } from '../dto/get-project-activity-query.dto';
 import { UpdateProjectDto } from '../dto/update-project.dto';
 import { ProjectsService } from '../service/projects.service';
 import type {
   DeleteProjectResponse,
+  ProjectActivityResponse,
   ProjectDetailResponse,
   ProjectListResponse,
   ProjectSummaryResponse,
@@ -42,6 +45,16 @@ export class ProjectsController {
     @CurrentUser() currentUser: AuthUserResponse,
   ): Promise<ProjectListResponse> {
     return this.projectsService.listProjects(currentUser);
+  }
+
+  @Get(':projectId/activity')
+  @UseGuards(JwtAuthGuard, ResourceAccessGuard)
+  @RequireProjectAccess()
+  getProjectActivity(
+    @Param('projectId') projectId: string,
+    @Query() query: GetProjectActivityQueryDto,
+  ): Promise<ProjectActivityResponse> {
+    return this.projectsService.getProjectActivity(projectId, query);
   }
 
   @Get(':projectId')

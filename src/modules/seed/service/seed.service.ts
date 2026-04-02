@@ -69,6 +69,29 @@ export class SeedService {
         },
       },
     });
+    await transactionClient.emailVerificationToken.deleteMany({
+      where: {
+        userId: {
+          in: [...DEMO_SEED_IDS.userIds],
+        },
+      },
+    });
+    await transactionClient.projectInvite.deleteMany({
+      where: {
+        OR: [
+          {
+            projectId: {
+              in: [...DEMO_SEED_IDS.projectIds],
+            },
+          },
+          {
+            invitedById: {
+              in: [...DEMO_SEED_IDS.userIds],
+            },
+          },
+        ],
+      },
+    });
     await transactionClient.taskLog.deleteMany({
       where: {
         taskId: {
@@ -126,6 +149,7 @@ export class SeedService {
         email: user.email,
         passwordHash,
         role: user.role,
+        emailVerifiedAt: user.emailVerifiedAt,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       })),

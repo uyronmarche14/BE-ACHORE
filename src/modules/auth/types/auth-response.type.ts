@@ -5,6 +5,7 @@ export type AuthUserResponse = {
   name: string;
   email: string;
   role: AppRole;
+  emailVerifiedAt: string | null;
 };
 
 export type AuthSessionResponse = {
@@ -12,7 +13,11 @@ export type AuthSessionResponse = {
   accessToken: string;
 };
 
-export type SignupResponse = AuthSessionResponse;
+export type SignupResponse = {
+  message: string;
+  email: string;
+  emailVerificationRequired: true;
+};
 
 export type LoginResponse = AuthSessionResponse;
 
@@ -28,12 +33,22 @@ export type LogoutResponse = {
   loggedOut: true;
 };
 
+export type VerifyEmailConfirmResponse = {
+  verified: true;
+  email: string;
+  redirectPath: string | null;
+};
+
+export type ResendVerificationResponse = {
+  message: string;
+};
+
 export type AuthSessionResult = AuthSessionResponse & {
   refreshToken: string;
   refreshTokenExpiresAt: Date;
 };
 
-export type SignupResult = AuthSessionResult;
+export type SignupResult = SignupResponse;
 
 export type LoginResult = AuthSessionResult;
 
@@ -41,3 +56,11 @@ export type RefreshResult = RefreshAccessTokenResponse & {
   refreshToken: string;
   refreshTokenExpiresAt: Date;
 };
+
+export type VerifyEmailConfirmResult = {
+  verified: true;
+  email: string;
+  redirectPath: string | null;
+};
+
+export type ResendVerificationResult = ResendVerificationResponse;

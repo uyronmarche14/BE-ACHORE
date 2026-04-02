@@ -38,6 +38,7 @@ describe('JwtAuthGuard', () => {
       name: 'Jane Doe',
       email: 'jane@example.com',
       role: 'MEMBER',
+      emailVerifiedAt: '2026-04-01T00:00:00.000Z',
     });
 
     await expect(
@@ -51,6 +52,7 @@ describe('JwtAuthGuard', () => {
       name: 'Jane Doe',
       email: 'jane@example.com',
       role: 'MEMBER',
+      emailVerifiedAt: '2026-04-01T00:00:00.000Z',
     });
   });
 
@@ -84,5 +86,5 @@ function createExecutionContext(
       getResponse: () => undefined,
       getNext: () => undefined,
     }),
-  } as ExecutionContext;
+  } as unknown as ExecutionContext;
 }

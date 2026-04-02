@@ -14,6 +14,17 @@ export type AppRuntimeConfig = {
   nodeEnv: 'development' | 'test' | 'production';
 };
 
+export type MailRuntimeConfig = {
+  smtpHost: string | null;
+  smtpPort: number | null;
+  smtpSecure: boolean | null;
+  smtpUser: string | null;
+  smtpPass: string | null;
+  smtpFrom: string | null;
+  frontendUrl: string;
+  nodeEnv: 'development' | 'test' | 'production';
+};
+
 export function getAppRuntimeConfig(
   configService: ConfigService,
 ): AppRuntimeConfig {
@@ -56,6 +67,23 @@ export function getAuthRuntimeConfig(configService: ConfigService) {
     jwtRefreshTtl,
     refreshCookieName,
     refreshCookieSecure,
+    frontendUrl,
+    nodeEnv,
+  };
+}
+
+export function getMailRuntimeConfig(
+  configService: ConfigService,
+): MailRuntimeConfig {
+  const { frontendUrl, nodeEnv } = getAppRuntimeConfig(configService);
+
+  return {
+    smtpHost: configService.get<string>('SMTP_HOST') ?? null,
+    smtpPort: configService.get<number>('SMTP_PORT') ?? null,
+    smtpSecure: configService.get<boolean>('SMTP_SECURE') ?? null,
+    smtpUser: configService.get<string>('SMTP_USER') ?? null,
+    smtpPass: configService.get<string>('SMTP_PASS') ?? null,
+    smtpFrom: configService.get<string>('SMTP_FROM') ?? null,
     frontendUrl,
     nodeEnv,
   };

@@ -1,4 +1,10 @@
-import { ProjectMemberRole, TaskStatus } from '@prisma/client';
+import {
+  Prisma,
+  ProjectMemberRole,
+  TaskLogEventType,
+  TaskStatus,
+} from '@prisma/client';
+import type { TaskLogValue } from '../../task-logs/types/task-log-response.type';
 
 export type ProjectTaskCounts = Record<TaskStatus, number>;
 
@@ -50,6 +56,32 @@ export type DeleteProjectResponse = {
   message: string;
 };
 
+export type ProjectActivityEntryResponse = {
+  id: string;
+  eventType: TaskLogEventType;
+  fieldName: string | null;
+  oldValue: TaskLogValue;
+  newValue: TaskLogValue;
+  summary: string;
+  createdAt: string;
+  actor: {
+    id: string;
+    name: string;
+  };
+  task: {
+    id: string;
+    title: string;
+    status: TaskStatus;
+  };
+};
+
+export type ProjectActivityResponse = {
+  items: ProjectActivityEntryResponse[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+
 export type ProjectSummaryRecord = {
   id: string;
   name: string;
@@ -92,4 +124,23 @@ export type ProjectDetailRecord = {
   description: string | null;
   members: ProjectDetailMemberRecord[];
   taskGroups: ProjectTaskGroupsRecord;
+};
+
+export type ProjectActivityRecord = {
+  id: string;
+  eventType: TaskLogEventType;
+  fieldName: string | null;
+  oldValue: Prisma.JsonValue;
+  newValue: Prisma.JsonValue;
+  summary: string;
+  createdAt: Date;
+  actor: {
+    id: string;
+    name: string;
+  };
+  task: {
+    id: string;
+    title: string;
+    status: TaskStatus;
+  };
 };

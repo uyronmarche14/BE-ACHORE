@@ -1,6 +1,8 @@
-import { ProjectMemberRole } from '@prisma/client';
+import { Prisma, ProjectMemberRole } from '@prisma/client';
 import type {
   DeleteProjectResponse,
+  ProjectActivityRecord,
+  ProjectActivityResponse,
   ProjectDetailMemberRecord,
   ProjectDetailRecord,
   ProjectDetailResponse,
@@ -14,6 +16,7 @@ import type {
   ProjectTaskGroupsResponse,
   ProjectDetailTaskRecord,
 } from '../types/project-response.type';
+import type { TaskLogValue } from '../../task-logs/types/task-log-response.type';
 
 export function mapProjectSummaryResponse(
   project: ProjectSummaryRecord,
@@ -74,6 +77,34 @@ export function mapDeleteProjectResponse(): DeleteProjectResponse {
   };
 }
 
+export function mapProjectActivityResponse(input: {
+  items: ProjectActivityRecord[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}): ProjectActivityResponse {
+  return {
+    items: input.items.map((entry) => ({
+      id: entry.id,
+      eventType: entry.eventType,
+      fieldName: entry.fieldName,
+      oldValue: normalizeTaskLogValue(entry.oldValue),
+      newValue: normalizeTaskLogValue(entry.newValue),
+      summary: entry.summary,
+      createdAt: entry.createdAt.toISOString(),
+      actor: entry.actor,
+      task: {
+        id: entry.task.id,
+        title: entry.task.title,
+        status: entry.task.status,
+      },
+    })),
+    page: input.page,
+    pageSize: input.pageSize,
+    hasMore: input.hasMore,
+  };
+}
+
 export function createEmptyProjectTaskCounts(): ProjectTaskCounts {
   return {
     TODO: 0,
@@ -125,4 +156,12 @@ function mapProjectTaskCardResponse(
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
   };
+}
+
+function normalizeTaskLogValue(value: unknown): TaskLogValue {
+  if (value === null || value === Prisma.JsonNull) {
+    return null;
+  }
+
+  return value as TaskLogValue;
 }

@@ -13,6 +13,12 @@ export const environmentValidationSchema = Joi.object({
   JWT_REFRESH_TTL: Joi.string().default('7d'),
   REFRESH_COOKIE_NAME: Joi.string().default('archon_refresh_token'),
   REFRESH_COOKIE_SECURE: Joi.boolean().optional(),
+  SMTP_HOST: Joi.string().hostname().optional(),
+  SMTP_PORT: Joi.number().port().optional(),
+  SMTP_SECURE: Joi.boolean().optional(),
+  SMTP_USER: Joi.string().optional(),
+  SMTP_PASS: Joi.string().optional(),
+  SMTP_FROM: Joi.string().email().optional(),
   SEED_ENABLED: Joi.boolean().default(false),
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')

@@ -8,6 +8,7 @@ describe('ResourceAuthorizationService', () => {
     name: 'Admin User',
     email: 'admin@example.com',
     role: 'ADMIN' as const,
+    emailVerifiedAt: '2026-04-01T00:00:00.000Z',
   };
 
   const ownerUser = {
@@ -15,6 +16,7 @@ describe('ResourceAuthorizationService', () => {
     name: 'Owner User',
     email: 'owner@example.com',
     role: 'MEMBER' as const,
+    emailVerifiedAt: '2026-04-01T00:00:00.000Z',
   };
 
   const memberUser = {
@@ -22,6 +24,7 @@ describe('ResourceAuthorizationService', () => {
     name: 'Member User',
     email: 'member@example.com',
     role: 'MEMBER' as const,
+    emailVerifiedAt: '2026-04-01T00:00:00.000Z',
   };
 
   const outsiderUser = {
@@ -29,6 +32,7 @@ describe('ResourceAuthorizationService', () => {
     name: 'Outsider User',
     email: 'outsider@example.com',
     role: 'MEMBER' as const,
+    emailVerifiedAt: '2026-04-01T00:00:00.000Z',
   };
 
   const mockPrismaService = {
