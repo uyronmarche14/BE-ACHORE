@@ -1,5 +1,7 @@
 # Manual Postman REST Tests
 
+For the shortest reviewer path, use this file alongside `docs/REVIEWER-PACK.md`.
+
 Use this file when you want to test the API manually in Postman without relying
 on collection scripts.
 

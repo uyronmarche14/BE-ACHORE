@@ -407,6 +407,42 @@ describe('TasksService', () => {
     expect(result.status).toBe(TaskStatus.IN_PROGRESS);
   });
 
+  it('does not create a status-change log when the patched status is unchanged', async () => {
+    mockPrismaService.task.findUnique.mockResolvedValue({
+      id: 'task-1',
+      status: TaskStatus.IN_PROGRESS,
+    });
+    mockPrismaService.task.update.mockResolvedValue({
+      id: 'task-1',
+      projectId: 'project-1',
+      title: 'Ship launch checklist',
+      description: null,
+      status: TaskStatus.IN_PROGRESS,
+      position: null,
+      assigneeId: null,
+      dueDate: null,
+      createdAt: new Date('2026-04-01T09:00:00.000Z'),
+      updatedAt: new Date('2026-04-06T10:00:00.000Z'),
+    });
+
+    await tasksService.updateTaskStatus(currentUser, 'task-1', {
+      status: TaskStatus.IN_PROGRESS,
+    });
+
+    expect(mockPrismaService.task.update).toHaveBeenCalledWith({
+      where: {
+        id: 'task-1',
+      },
+      data: {
+        status: TaskStatus.IN_PROGRESS,
+        position: null,
+        updatedById: 'member-1',
+      },
+      select: expect.any(Object),
+    });
+    expect(mockPrismaService.taskLog.create).not.toHaveBeenCalled();
+  });
+
   it('returns not found when patching the status of a missing task', async () => {
     mockPrismaService.task.findUnique.mockResolvedValue(null);
 

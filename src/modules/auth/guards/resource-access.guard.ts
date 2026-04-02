@@ -1,10 +1,6 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { createUnauthenticatedException } from '../../../common/utils/api-exception.util';
 import { RESOURCE_ACCESS_METADATA } from '../constants/auth-metadata.constant';
 import { ResourceAuthorizationService } from '../service/resource-authorization.service';
 import type { AuthenticatedRequest } from '../types/authenticated-request.type';
@@ -30,20 +26,16 @@ export class ResourceAccessGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     if (!request.user) {
-      throw new UnauthorizedException({
-        code: 'UNAUTHENTICATED',
+      throw createUnauthenticatedException({
         message: 'Authentication is required',
-        details: null,
       });
     }
 
     const resourceId = request.params?.[metadata.param];
 
     if (typeof resourceId !== 'string' || resourceId.length === 0) {
-      throw new UnauthorizedException({
-        code: 'UNAUTHENTICATED',
+      throw createUnauthenticatedException({
         message: 'Authentication is required',
-        details: null,
       });
     }
 

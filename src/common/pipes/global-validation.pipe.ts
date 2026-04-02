@@ -1,6 +1,7 @@
-import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import type { ValidationError } from '@nestjs/common';
 import { formatValidationErrors } from '../utils/api-error.util';
+import { createValidationException } from '../utils/api-exception.util';
 
 export function createGlobalValidationPipe(): ValidationPipe {
   return new ValidationPipe({
@@ -12,8 +13,7 @@ export function createGlobalValidationPipe(): ValidationPipe {
       value: false,
     },
     exceptionFactory: (validationErrors: ValidationError[]) =>
-      new BadRequestException({
-        code: 'VALIDATION_ERROR',
+      createValidationException({
         message: 'Request validation failed',
         details: formatValidationErrors(validationErrors),
       }),

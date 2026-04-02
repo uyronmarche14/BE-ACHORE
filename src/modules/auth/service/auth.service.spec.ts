@@ -174,13 +174,29 @@ describe('AuthService', () => {
     mockPrismaService.user.create.mockRejectedValue({ code: 'P2002' });
     const authService = createAuthService();
 
-    await expect(
-      authService.signup({
+    try {
+      await authService.signup({
         name: 'Jane Doe',
         email: 'jane@example.com',
         password: 'StrongPass1',
-      }),
-    ).rejects.toBeInstanceOf(ConflictException);
+      });
+    } catch (error) {
+      const exception = error as ConflictException;
+      const response = exception.getResponse() as {
+        code: string;
+        details: Record<string, string[]>;
+        message: string;
+      };
+
+      expect(exception.getStatus()).toBe(409);
+      expect(response).toEqual({
+        code: 'CONFLICT',
+        message: 'An account with this email already exists',
+        details: {
+          email: ['Email is already in use'],
+        },
+      });
+    }
   });
 
   it('logs in an existing user and persists a fresh refresh token', async () => {

@@ -8,6 +8,7 @@ Current scope:
 - health module wiring verification
 - auth, authorization, project CRUD, task CRUD, task logs, and seed/demo e2e coverage
 - Postman collection assets for manual API verification live in `test/postman/`
+- reviewer walkthrough and final smoke flow live in `docs/REVIEWER-PACK.md`
 
 ## Postman Coverage
 

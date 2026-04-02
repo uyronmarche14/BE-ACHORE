@@ -1,9 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma, TaskStatus } from '@prisma/client';
+import {
+  createNotFoundException,
+  createValidationException,
+} from '../../../common/utils/api-exception.util';
 import { groupTaskRecordsByStatus } from '../../../common/utils/task-groups.util';
 import { PrismaService } from '../../../database/prisma.service';
 import type { AuthUserResponse } from '../../auth/types/auth-response.type';
@@ -202,13 +202,15 @@ export class TasksService {
           select: taskResponseSelect,
         });
 
-        await this.taskLogsService.createStatusChangedLog(transactionClient, {
-          actorId: currentUser.id,
-          actorName: currentUser.name,
-          taskId: updatedTask.id,
-          previousStatus: existingTask.status,
-          nextStatus: updateTaskStatusDto.status,
-        });
+        if (existingTask.status !== updateTaskStatusDto.status) {
+          await this.taskLogsService.createStatusChangedLog(transactionClient, {
+            actorId: currentUser.id,
+            actorName: currentUser.name,
+            taskId: updatedTask.id,
+            previousStatus: existingTask.status,
+            nextStatus: updateTaskStatusDto.status,
+          });
+        }
 
         return mapTaskResponse(updatedTask);
       });
@@ -260,8 +262,7 @@ export class TasksService {
     });
 
     if (!membership) {
-      throw new BadRequestException({
-        code: 'VALIDATION_ERROR',
+      throw createValidationException({
         message: 'Request validation failed',
         details: {
           assigneeId: ['Assignee must be a member of the project'],
@@ -271,10 +272,8 @@ export class TasksService {
   }
 
   private createTaskNotFoundException() {
-    return new NotFoundException({
-      code: 'NOT_FOUND',
+    return createNotFoundException({
       message: 'Task not found',
-      details: null,
     });
   }
 

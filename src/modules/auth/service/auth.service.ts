@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import {
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { RefreshToken, User } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import {
+  createConflictException,
+  createUnauthenticatedException,
+} from '../../../common/utils/api-exception.util';
 import { PrismaService } from '../../../database/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import ms from 'ms';
@@ -75,8 +75,7 @@ export class AuthService {
       return this.buildAuthSessionResult(user, tokenBundle);
     } catch (error) {
       if (isPrismaUniqueConstraintError(error)) {
-        throw new ConflictException({
-          code: 'CONFLICT',
+        throw createConflictException({
           message: 'An account with this email already exists',
           details: {
             email: ['Email is already in use'],
@@ -358,10 +357,8 @@ export class AuthService {
   }
 
   private createUnauthenticatedException(message: string) {
-    return new UnauthorizedException({
-      code: 'UNAUTHENTICATED',
+    return createUnauthenticatedException({
       message,
-      details: null,
     });
   }
 }

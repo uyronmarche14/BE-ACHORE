@@ -1,5 +1,6 @@
-import { NotFoundException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ProjectMemberRole } from '@prisma/client';
+import { createNotFoundException } from '../../../common/utils/api-exception.util';
 import { groupTaskRecordsByStatus } from '../../../common/utils/task-groups.util';
 import { PrismaService } from '../../../database/prisma.service';
 import type { AuthUserResponse } from '../../auth/types/auth-response.type';
@@ -157,10 +158,8 @@ export class ProjectsService {
     return mapDeleteProjectResponse();
   }
   private createProjectNotFoundException() {
-    return new NotFoundException({
-      code: 'NOT_FOUND',
+    return createNotFoundException({
       message: 'Project not found',
-      details: null,
     });
   }
 }

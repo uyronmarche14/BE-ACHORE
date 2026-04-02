@@ -1,11 +1,6 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  HttpException,
-  HttpStatus,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { createRateLimitedException } from '../../../common/utils/api-exception.util';
 import type { Request } from 'express';
 import { AUTH_RATE_LIMIT_METADATA } from '../constants/auth-metadata.constant';
 import { AuthRateLimitService } from '../service/auth-rate-limit.service';
@@ -33,14 +28,9 @@ export class AuthRateLimitGuard implements CanActivate {
     const allowed = this.authRateLimitService.consume(metadata, clientId);
 
     if (!allowed) {
-      throw new HttpException(
-        {
-          code: 'RATE_LIMITED',
-          message: 'Too many auth attempts. Please try again later.',
-          details: null,
-        },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      throw createRateLimitedException({
+        message: 'Too many auth attempts. Please try again later.',
+      });
     }
 
     return true;

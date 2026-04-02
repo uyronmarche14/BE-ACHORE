@@ -1,8 +1,8 @@
+import { Injectable } from '@nestjs/common';
 import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+  createForbiddenException,
+  createNotFoundException,
+} from '../../../common/utils/api-exception.util';
 import { PrismaService } from '../../../database/prisma.service';
 import type {
   AuthorizedProjectContext,
@@ -128,42 +128,32 @@ export class ResourceAuthorizationService {
   }
 
   private createOwnerRequiredException() {
-    return new ForbiddenException({
-      code: 'FORBIDDEN',
+    return createForbiddenException({
       message: 'Only the project owner can perform this action',
-      details: null,
     });
   }
 
   private createProjectAccessForbiddenException() {
-    return new ForbiddenException({
-      code: 'FORBIDDEN',
+    return createForbiddenException({
       message: 'You do not have access to this project',
-      details: null,
     });
   }
 
   private createTaskAccessForbiddenException() {
-    return new ForbiddenException({
-      code: 'FORBIDDEN',
+    return createForbiddenException({
       message: 'You do not have access to this task',
-      details: null,
     });
   }
 
   private createProjectNotFoundException() {
-    return new NotFoundException({
-      code: 'NOT_FOUND',
+    return createNotFoundException({
       message: 'Project not found',
-      details: null,
     });
   }
 
   private createTaskNotFoundException() {
-    return new NotFoundException({
-      code: 'NOT_FOUND',
+    return createNotFoundException({
       message: 'Task not found',
-      details: null,
     });
   }
 }

@@ -1,7 +1,8 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, TaskStatus } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { createForbiddenException } from '../../../common/utils/api-exception.util';
 import { PrismaService } from '../../../database/prisma.service';
 import { TaskLogsService } from '../../task-logs/service/task-logs.service';
 import {
@@ -52,10 +53,8 @@ export class SeedService {
     >('NODE_ENV');
 
     if (!seedEnabled || nodeEnv === 'production') {
-      throw new ForbiddenException({
-        code: 'FORBIDDEN',
+      throw createForbiddenException({
         message: 'Seed initialization is disabled in this environment',
-        details: null,
       });
     }
   }

@@ -1,9 +1,5 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { createUnauthenticatedException } from '../../../common/utils/api-exception.util';
 import { AuthService } from '../service/auth.service';
 import { extractBearerToken } from '../utils/auth-request.util';
 import type { AuthenticatedRequest } from '../types/authenticated-request.type';
@@ -26,10 +22,8 @@ export class JwtAuthGuard implements CanActivate {
   }
 
   private createUnauthenticatedException() {
-    return new UnauthorizedException({
-      code: 'UNAUTHENTICATED',
+    return createUnauthenticatedException({
       message: 'Authentication is required',
-      details: null,
     });
   }
 }
