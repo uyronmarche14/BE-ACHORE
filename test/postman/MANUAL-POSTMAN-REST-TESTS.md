@@ -301,7 +301,7 @@ Expected status: `200`
 
 Expected status: `200`
 
-### 18. Tasks Require Auth
+### 18. Patch Task Status
 
 - Method: `PATCH`
 - URL: `{{baseUrl}}/tasks/{{taskId}}/status`
@@ -325,7 +325,23 @@ Expected payload:
 - `data.position`
 - `data.updatedAt`
 
-### 19. Tasks Require Auth
+### 19. Load Task Logs
+
+- Method: `GET`
+- URL: `{{baseUrl}}/tasks/{{taskId}}/logs`
+- Headers:
+  - `Authorization: Bearer {{ownerAccessToken}}`
+- Body: none
+
+Expected status: `200`
+
+Expected payload:
+
+- `data.items`
+- newest entry reflects the latest edit or status change
+- entries include `summary`, `actor`, `oldValue`, and `newValue`
+
+### 20. Tasks Require Auth
 
 - Method: `GET`
 - URL: `{{baseUrl}}/tasks/{{taskId}}`
@@ -334,7 +350,7 @@ Expected payload:
 
 Expected status: `401`
 
-### 20. Forbidden Task Detail As Outsider
+### 21. Forbidden Task Detail As Outsider
 
 - Method: `GET`
 - URL: `{{baseUrl}}/tasks/{{taskId}}`
@@ -344,7 +360,7 @@ Expected status: `401`
 
 Expected status: `403`
 
-### 21. Missing Task Detail
+### 22. Missing Task Detail
 
 - Method: `GET`
 - URL: `{{baseUrl}}/tasks/{{missingTaskId}}`
@@ -354,7 +370,7 @@ Expected status: `403`
 
 Expected status: `404`
 
-### 22. Delete Task
+### 23. Delete Task
 
 - Method: `DELETE`
 - URL: `{{baseUrl}}/tasks/{{taskId}}`
@@ -364,7 +380,7 @@ Expected status: `404`
 
 Expected status: `200`
 
-### 23. Deleted Task Returns 404
+### 24. Deleted Task Returns 404
 
 - Method: `GET`
 - URL: `{{baseUrl}}/tasks/{{taskId}}`
@@ -376,7 +392,7 @@ Expected status: `404`
 
 ## Cleanup
 
-### 24. Delete Project As Owner
+### 25. Delete Project As Owner
 
 - Method: `DELETE`
 - URL: `{{baseUrl}}/projects/{{projectId}}`
@@ -386,7 +402,7 @@ Expected status: `404`
 
 Expected status: `200`
 
-### 25. Deleted Project Returns 404
+### 26. Deleted Project Returns 404
 
 - Method: `GET`
 - URL: `{{baseUrl}}/projects/{{projectId}}`
@@ -396,7 +412,7 @@ Expected status: `200`
 
 Expected status: `404`
 
-### 26. Logout Owner
+### 27. Logout Owner
 
 - Method: `POST`
 - URL: `{{baseUrl}}/auth/logout`

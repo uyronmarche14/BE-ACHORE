@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { ResourceAccessGuard } from '../src/modules/auth/guards/resource-access.guard';
 import { AuthService } from '../src/modules/auth/service/auth.service';
 import { ResourceAuthorizationService } from '../src/modules/auth/service/resource-authorization.service';
+import { TaskLogsService } from '../src/modules/task-logs/service/task-logs.service';
 import type { AuthenticatedRequest } from '../src/modules/auth/types/authenticated-request.type';
 import { TasksController } from '../src/modules/tasks/controller/tasks.controller';
 import { TasksService } from '../src/modules/tasks/service/tasks.service';
@@ -29,6 +30,7 @@ describe('TasksController (e2e)', () => {
   };
 
   const mockPrismaService = {
+    $transaction: jest.fn(),
     project: {
       findUnique: jest.fn(),
     },
@@ -42,17 +44,35 @@ describe('TasksController (e2e)', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    taskLog: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+    },
+    user: {
+      findUnique: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
     mockPrismaService.project.findUnique.mockReset();
     mockPrismaService.projectMember.findUnique.mockReset();
+    mockPrismaService.$transaction.mockReset();
     mockPrismaService.task.create.mockReset();
     mockPrismaService.task.findMany.mockReset();
     mockPrismaService.task.findUnique.mockReset();
     mockPrismaService.task.update.mockReset();
     mockPrismaService.task.delete.mockReset();
+    mockPrismaService.taskLog.create.mockReset();
+    mockPrismaService.taskLog.findMany.mockReset();
+    mockPrismaService.user.findUnique.mockReset();
+    mockPrismaService.$transaction.mockImplementation(
+      async (
+        callback: (
+          transactionClient: typeof mockPrismaService,
+        ) => Promise<unknown>,
+      ) => callback(mockPrismaService),
+    );
 
     mockAuthService.authenticateAccessToken.mockImplementation(
       (accessToken: string | null) => {
@@ -100,6 +120,7 @@ describe('TasksController (e2e)', () => {
         JwtAuthGuard,
         ResourceAccessGuard,
         ResourceAuthorizationService,
+        TaskLogsService,
         {
           provide: AuthService,
           useValue: mockAuthService,
@@ -385,6 +406,10 @@ describe('TasksController (e2e)', () => {
       .mockResolvedValueOnce({
         id: 'membership-1',
       });
+    mockPrismaService.user.findUnique.mockResolvedValue({
+      id: 'member-1',
+      name: 'Member User',
+    });
     mockPrismaService.task.create.mockResolvedValue({
       id: 'task-1',
       projectId: 'project-1',

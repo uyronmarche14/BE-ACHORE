@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { TaskStatus } from '@prisma/client';
+import { Prisma, TaskStatus } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import { TaskLogsService } from '../../task-logs/service/task-logs.service';
 import { TasksService } from './tasks.service';
 
 describe('TasksService', () => {
@@ -14,6 +15,7 @@ describe('TasksService', () => {
   };
 
   const mockPrismaService = {
+    $transaction: jest.fn(),
     task: {
       create: jest.fn(),
       findMany: jest.fn(),
@@ -21,10 +23,18 @@ describe('TasksService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    taskLog: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+    },
     projectMember: {
       findUnique: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn(),
+    },
   } as unknown as PrismaService & {
+    $transaction: jest.Mock;
     task: {
       create: jest.Mock;
       findMany: jest.Mock;
@@ -32,23 +42,43 @@ describe('TasksService', () => {
       update: jest.Mock;
       delete: jest.Mock;
     };
+    taskLog: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+    };
     projectMember: {
+      findUnique: jest.Mock;
+    };
+    user: {
       findUnique: jest.Mock;
     };
   };
 
   let tasksService: TasksService;
+  let taskLogsService: TaskLogsService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPrismaService.$transaction.mockReset();
     mockPrismaService.task.create.mockReset();
     mockPrismaService.task.findMany.mockReset();
     mockPrismaService.task.findUnique.mockReset();
     mockPrismaService.task.update.mockReset();
     mockPrismaService.task.delete.mockReset();
+    mockPrismaService.taskLog.create.mockReset();
+    mockPrismaService.taskLog.findMany.mockReset();
     mockPrismaService.projectMember.findUnique.mockReset();
+    mockPrismaService.user.findUnique.mockReset();
+    mockPrismaService.$transaction.mockImplementation(
+      async (
+        callback: (
+          transactionClient: typeof mockPrismaService,
+        ) => Promise<unknown>,
+      ) => callback(mockPrismaService),
+    );
 
-    tasksService = new TasksService(mockPrismaService);
+    taskLogsService = new TaskLogsService(mockPrismaService);
+    tasksService = new TasksService(mockPrismaService, taskLogsService);
   });
 
   it('lists project tasks grouped by status with board-stable ordering', async () => {
@@ -219,6 +249,14 @@ describe('TasksService', () => {
       },
       select: expect.any(Object),
     });
+    expect(mockPrismaService.taskLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        taskId: 'task-1',
+        actorId: 'member-1',
+        eventType: 'TASK_CREATED',
+        summary: 'Member User created the task',
+      }),
+    });
     expect(result).toEqual({
       id: 'task-1',
       projectId: 'project-1',
@@ -275,6 +313,10 @@ describe('TasksService', () => {
   });
 
   it('patches task status, clears omitted position, and stamps updatedById', async () => {
+    mockPrismaService.task.findUnique.mockResolvedValue({
+      id: 'task-1',
+      status: TaskStatus.TODO,
+    });
     mockPrismaService.task.update.mockResolvedValue({
       id: 'task-1',
       projectId: 'project-1',
@@ -303,6 +345,16 @@ describe('TasksService', () => {
       },
       select: expect.any(Object),
     });
+    expect(mockPrismaService.taskLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        taskId: 'task-1',
+        actorId: 'member-1',
+        eventType: 'STATUS_CHANGED',
+        fieldName: 'status',
+        oldValue: TaskStatus.TODO,
+        newValue: TaskStatus.DONE,
+      }),
+    });
     expect(result).toEqual({
       id: 'task-1',
       projectId: 'project-1',
@@ -318,6 +370,10 @@ describe('TasksService', () => {
   });
 
   it('persists an explicit positive position when patching task status', async () => {
+    mockPrismaService.task.findUnique.mockResolvedValue({
+      id: 'task-1',
+      status: TaskStatus.TODO,
+    });
     mockPrismaService.task.update.mockResolvedValue({
       id: 'task-1',
       projectId: 'project-1',
@@ -352,9 +408,7 @@ describe('TasksService', () => {
   });
 
   it('returns not found when patching the status of a missing task', async () => {
-    mockPrismaService.task.update.mockRejectedValue({
-      code: 'P2025',
-    });
+    mockPrismaService.task.findUnique.mockResolvedValue(null);
 
     await expect(
       tasksService.updateTaskStatus(currentUser, 'missing-task', {
@@ -366,9 +420,17 @@ describe('TasksService', () => {
   it('updates allowed task fields and stamps updatedById', async () => {
     mockPrismaService.task.findUnique.mockResolvedValue({
       projectId: 'project-1',
+      title: 'Ship launch checklist',
+      description: null,
+      assigneeId: null,
+      dueDate: null,
     });
     mockPrismaService.projectMember.findUnique.mockResolvedValue({
       id: 'membership-2',
+    });
+    mockPrismaService.user.findUnique.mockResolvedValue({
+      id: 'member-2',
+      name: 'Jordan Lane',
     });
     mockPrismaService.task.update.mockResolvedValue({
       id: 'task-1',
@@ -402,6 +464,49 @@ describe('TasksService', () => {
         updatedById: 'member-1',
       },
       select: expect.any(Object),
+    });
+    expect(mockPrismaService.taskLog.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        taskId: 'task-1',
+        actorId: 'member-1',
+        eventType: 'TASK_UPDATED',
+        fieldName: 'title',
+        oldValue: 'Ship launch checklist',
+        newValue: 'Review release notes',
+      }),
+    });
+    expect(mockPrismaService.taskLog.create).toHaveBeenNthCalledWith(2, {
+      data: expect.objectContaining({
+        taskId: 'task-1',
+        actorId: 'member-1',
+        eventType: 'TASK_UPDATED',
+        fieldName: 'description',
+        oldValue: Prisma.JsonNull,
+        newValue: 'Review release notes with QA',
+      }),
+    });
+    expect(mockPrismaService.taskLog.create).toHaveBeenNthCalledWith(3, {
+      data: expect.objectContaining({
+        taskId: 'task-1',
+        actorId: 'member-1',
+        eventType: 'TASK_UPDATED',
+        fieldName: 'dueDate',
+        oldValue: Prisma.JsonNull,
+        newValue: '2026-04-20',
+      }),
+    });
+    expect(mockPrismaService.taskLog.create).toHaveBeenNthCalledWith(4, {
+      data: expect.objectContaining({
+        taskId: 'task-1',
+        actorId: 'member-1',
+        eventType: 'TASK_UPDATED',
+        fieldName: 'assigneeId',
+        oldValue: expect.anything(),
+        newValue: {
+          id: 'member-2',
+          name: 'Jordan Lane',
+        },
+      }),
     });
     expect(result).toEqual({
       id: 'task-1',
