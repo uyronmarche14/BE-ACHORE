@@ -6,7 +6,7 @@ Current scope:
 
 - application bootstrap verification
 - health module wiring verification
-- auth, authorization, project CRUD, task CRUD, and project task loading e2e coverage
+- auth, authorization, project CRUD, task CRUD, task logs, and seed/demo e2e coverage
 - Postman collection assets for manual API verification live in `test/postman/`
 
 ## Postman Coverage
@@ -27,6 +27,7 @@ The collection covers:
 The manual Postman guide also covers:
 
 - grouped `GET /projects/:projectId/tasks` board loading verification
+- `POST /seed/init` demo bootstrap and seeded reviewer login flow
 
 Run notes:
 

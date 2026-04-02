@@ -13,12 +13,14 @@ type TaskLogClient = Prisma.TransactionClient | PrismaService;
 type CreateTaskCreatedLogParams = {
   actorId: string;
   actorName: string;
+  createdAt?: Date;
   taskId: string;
 };
 
 type CreateTaskUpdatedLogParams = {
   actorId: string;
   actorName: string;
+  createdAt?: Date;
   taskId: string;
   changes: TaskLogFieldChange[];
 };
@@ -26,6 +28,7 @@ type CreateTaskUpdatedLogParams = {
 type CreateStatusChangedLogParams = {
   actorId: string;
   actorName: string;
+  createdAt?: Date;
   taskId: string;
   previousStatus: TaskStatus;
   nextStatus: TaskStatus;
@@ -68,6 +71,7 @@ export class TaskLogsService {
         oldValue: Prisma.JsonNull,
         newValue: Prisma.JsonNull,
         summary: `${params.actorName} created the task`,
+        ...(params.createdAt ? { createdAt: params.createdAt } : {}),
       },
     });
   }
@@ -93,6 +97,7 @@ export class TaskLogsService {
             summary: `${params.actorName} updated the ${getTaskFieldLabel(
               change.fieldName,
             )}`,
+            ...(params.createdAt ? { createdAt: params.createdAt } : {}),
           },
         }),
       ),
@@ -118,6 +123,7 @@ export class TaskLogsService {
         summary: `${params.actorName} moved the task from ${formatTaskStatusLabel(
           params.previousStatus,
         )} to ${formatTaskStatusLabel(params.nextStatus)}`,
+        ...(params.createdAt ? { createdAt: params.createdAt } : {}),
       },
     });
   }

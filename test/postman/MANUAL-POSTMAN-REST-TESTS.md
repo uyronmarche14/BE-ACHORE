@@ -23,6 +23,9 @@ Recommended temporary values:
 - `updatedTaskTitle = Manual launch checklist updated`
 - `missingProjectId = missing-project-id`
 - `missingTaskId = missing-task-id`
+- `demoMemberEmail = demo.member@example.com`
+- `demoAdminEmail = demo.admin@example.com`
+- `demoPassword = DemoPass123!`
 
 After successful requests, copy these values from the response into Postman
 variables for later requests:
@@ -31,6 +34,46 @@ variables for later requests:
 - `outsiderAccessToken`
 - `projectId`
 - `taskId`
+
+## Demo Bootstrap
+
+### 0. Seed Demo Data
+
+- Method: `POST`
+- URL: `{{baseUrl}}/seed/init`
+- Headers: none
+- Body: none
+
+Expected status: `201`
+
+Notes:
+
+- backend must be running with `SEED_ENABLED=true`
+- endpoint is intentionally unauthenticated in v1 but still blocked outside
+  non-production environments
+
+### 0.1 Login Seeded Demo Member
+
+- Method: `POST`
+- URL: `{{baseUrl}}/auth/login`
+- Headers:
+  - `Content-Type: application/json`
+- Body:
+
+```json
+{
+  "email": "{{demoMemberEmail}}",
+  "password": "{{demoPassword}}"
+}
+```
+
+Expected status: `200`
+
+Demo checks after login:
+
+- list projects and confirm two seeded projects are available
+- open the primary project board and confirm `TODO`, `IN_PROGRESS`, and `DONE`
+- open task `Finalize demo board narrative` and confirm activity logs appear
 
 ## Auth
 

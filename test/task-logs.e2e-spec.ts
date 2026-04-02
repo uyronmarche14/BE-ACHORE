@@ -591,9 +591,14 @@ async function executeTaskLogsRoute({
   resourceAccessGuard: ResourceAccessGuard;
   request: AuthenticatedRequest;
 }) {
+  // Preserve the decorated controller method reference so guard metadata resolves.
+  // eslint-disable-next-line @typescript-eslint/unbound-method
+  const controllerHandler = TaskLogsController.prototype.listTaskLogs as (
+    taskId: string,
+  ) => Promise<unknown>;
   const executionContext = createExecutionContext(
     taskLogsController.constructor as typeof TaskLogsController,
-    (...args: unknown[]) => taskLogsController.listTaskLogs(...args),
+    controllerHandler,
     request,
   );
 

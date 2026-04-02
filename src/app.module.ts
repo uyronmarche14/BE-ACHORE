@@ -9,6 +9,7 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { ProjectsModule } from './modules/projects/projects.module';
+import { SeedModule } from './modules/seed/seed.module';
 import { TaskLogsModule } from './modules/task-logs/task-logs.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 
@@ -25,6 +26,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
     AuthModule,
     HealthModule,
     ProjectsModule,
+    SeedModule,
     TaskLogsModule,
     TasksModule,
   ],
