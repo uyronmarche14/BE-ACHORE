@@ -1,9 +1,9 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { Duplex } from 'node:stream';
+import { pathToFileURL } from 'node:url';
 import type { INestApplication } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
-import type { Type } from '@nestjs/common';
 
 type OpenApiDocument = {
   components: {
@@ -12,6 +12,25 @@ type OpenApiDocument = {
   };
   paths: Record<string, Record<string, Record<string, unknown>>>;
 };
+
+type BuiltAppModule = typeof import('../src/app.module');
+type BuiltConfigureApplicationModule =
+  typeof import('../src/common/bootstrap/configure-application');
+type BuiltConfigureSwaggerModule =
+  typeof import('../src/common/bootstrap/configure-swagger');
+type BuiltPrismaServiceModule = typeof import('../src/database/prisma.service');
+
+type HttpRouteHandler = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  next: (error?: Error) => void,
+) => void;
+
+type ResponseChunk = string | Uint8Array;
+type ResponseWriteCallback = (error?: Error | null) => void;
+type ResponseWriteEncoding = BufferEncoding | ResponseWriteCallback;
+type ResponseEndCallback = () => void;
+type ResponseEndEncoding = BufferEncoding | ResponseEndCallback;
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -32,19 +51,23 @@ describe('Swagger docs (e2e)', () => {
       NODE_ENV: 'test',
     };
 
-    const { AppModule } = require(join(__dirname, '../dist/src/app.module.js'));
-    const { configureApplication } = require(
-      join(__dirname, '../dist/src/common/bootstrap/configure-application.js'),
+    const { AppModule } = await loadBuiltModule<BuiltAppModule>(
+      '../dist/src/app.module.js',
     );
-    const { configureSwagger } = require(
-      join(__dirname, '../dist/src/common/bootstrap/configure-swagger.js'),
-    );
-    const { PrismaService } = require(
-      join(__dirname, '../dist/src/database/prisma.service.js'),
+    const { configureApplication } =
+      await loadBuiltModule<BuiltConfigureApplicationModule>(
+        '../dist/src/common/bootstrap/configure-application.js',
+      );
+    const { configureSwagger } =
+      await loadBuiltModule<BuiltConfigureSwaggerModule>(
+        '../dist/src/common/bootstrap/configure-swagger.js',
+      );
+    const { PrismaService } = await loadBuiltModule<BuiltPrismaServiceModule>(
+      '../dist/src/database/prisma.service.js',
     );
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule as Type<unknown>],
+      imports: [AppModule],
     })
       .overrideProvider(PrismaService)
       .useValue({
@@ -67,7 +90,7 @@ describe('Swagger docs (e2e)', () => {
   });
 
   it('serves the Swagger UI and publishes an accurate prefixed OpenAPI document', async () => {
-    const httpHandler = app!.getHttpAdapter().getInstance();
+    const httpHandler = app!.getHttpAdapter().getInstance() as HttpRouteHandler;
     const uiResponse = await invokeExpressRoute(httpHandler, '/api/v1/docs');
 
     expect(uiResponse.statusCode).toBeLessThan(400);
@@ -238,14 +261,7 @@ class MockSocket extends Duplex {
   }
 }
 
-async function invokeExpressRoute(
-  handler: (
-    req: IncomingMessage,
-    res: ServerResponse,
-    next: (error?: Error) => void,
-  ) => void,
-  url: string,
-) {
+async function invokeExpressRoute(handler: HttpRouteHandler, url: string) {
   const socket = new MockSocket();
   const request = new IncomingMessage(socket);
   request.method = 'GET';
@@ -266,7 +282,11 @@ async function invokeExpressRoute(
   const originalWrite = response.write.bind(response);
   const originalEnd = response.end.bind(response);
 
-  response.write = function write(chunk, encoding, callback) {
+  response.write = function write(
+    chunk: ResponseChunk,
+    encoding?: ResponseWriteEncoding,
+    callback?: ResponseWriteCallback,
+  ) {
     if (chunk) {
       bodyChunks.push(
         Buffer.isBuffer(chunk)
@@ -281,7 +301,11 @@ async function invokeExpressRoute(
     return originalWrite(chunk, encoding, callback);
   };
 
-  response.end = function end(chunk, encoding, callback) {
+  response.end = function end(
+    chunk?: ResponseChunk,
+    encoding?: ResponseEndEncoding,
+    callback?: ResponseEndCallback,
+  ) {
     if (chunk) {
       bodyChunks.push(
         Buffer.isBuffer(chunk)
@@ -311,4 +335,11 @@ async function invokeExpressRoute(
     headers: response.getHeaders(),
     body: Buffer.concat(bodyChunks).toString('utf8'),
   };
+}
+
+async function loadBuiltModule<TModule>(
+  relativePath: string,
+): Promise<TModule> {
+  const moduleUrl = pathToFileURL(join(__dirname, relativePath)).href;
+  return (await import(moduleUrl)) as TModule;
 }
