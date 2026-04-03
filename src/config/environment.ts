@@ -1,9 +1,13 @@
 import Joi from 'joi';
 
 export const environmentValidationSchema = Joi.object({
+  APP_ENV: Joi.string()
+    .valid('local', 'development', 'test', 'staging', 'prod', 'production')
+    .optional(),
   PORT: Joi.number().port().default(4000),
   APP_URL: Joi.string().uri().default('http://localhost:4000'),
   FRONTEND_URL: Joi.string().uri().default('http://localhost:3000'),
+  SWAGGER_ENABLED: Joi.boolean().default(false),
   DATABASE_URL: Joi.string()
     .uri({ scheme: ['mysql'] })
     .default('mysql://dowinn:dowinn@127.0.0.1:3308/dowinn'),
@@ -26,7 +30,40 @@ export const environmentValidationSchema = Joi.object({
 });
 
 export function getEnvironmentFilePaths() {
+  const appEnv = normalizeEnvironmentSelector(process.env.APP_ENV);
   const nodeEnv = process.env.NODE_ENV ?? 'development';
 
-  return [`.env.${nodeEnv}.local`, `.env.${nodeEnv}`, '.env.local', '.env'];
+  return deduplicateEnvironmentFilePaths([
+    ...getAppEnvironmentFilePaths(appEnv),
+    `.env.${nodeEnv}.local`,
+    `.env.${nodeEnv}`,
+    '.env.local',
+    '.env',
+  ]);
+}
+
+function getAppEnvironmentFilePaths(appEnv?: string) {
+  if (!appEnv) {
+    return [];
+  }
+
+  if (appEnv === 'local') {
+    return ['.env.local'];
+  }
+
+  return [`.env.${appEnv}.local`, `.env.${appEnv}`];
+}
+
+function normalizeEnvironmentSelector(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalizedValue = value.trim();
+
+  return normalizedValue.length > 0 ? normalizedValue : undefined;
+}
+
+function deduplicateEnvironmentFilePaths(filePaths: string[]) {
+  return [...new Set(filePaths)];
 }

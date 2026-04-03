@@ -7,6 +7,9 @@ dist/
 .env.test
 .env.test.local
 .env.production
+.env.prod
 .env.production.local
+.env.staging
+.env.staging.local
 coverage/
 .DS_Store

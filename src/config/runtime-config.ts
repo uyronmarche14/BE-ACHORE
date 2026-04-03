@@ -5,6 +5,7 @@ export type AppRuntimeConfig = {
   port: number;
   appUrl: string;
   frontendUrl: string;
+  swaggerEnabled: boolean;
   jwtAccessSecret: string;
   jwtRefreshSecret: string;
   jwtAccessTtl: StringValue;
@@ -32,6 +33,7 @@ export function getAppRuntimeConfig(
     port: configService.getOrThrow<number>('PORT'),
     appUrl: configService.getOrThrow<string>('APP_URL'),
     frontendUrl: configService.getOrThrow<string>('FRONTEND_URL'),
+    swaggerEnabled: configService.get<boolean>('SWAGGER_ENABLED') ?? false,
     jwtAccessSecret: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
     jwtRefreshSecret: configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
     jwtAccessTtl: configService.getOrThrow<StringValue>('JWT_ACCESS_TTL'),

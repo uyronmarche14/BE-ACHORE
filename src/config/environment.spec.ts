@@ -1,8 +1,17 @@
 import { ConfigService } from '@nestjs/config';
-import { environmentValidationSchema } from './environment';
+import {
+  environmentValidationSchema,
+  getEnvironmentFilePaths,
+} from './environment';
 import { getAuthRuntimeConfig } from './runtime-config';
 
 describe('environment configuration', () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
   it('requires JWT secrets to be defined', () => {
     const result = environmentValidationSchema.validate(
       {
@@ -38,6 +47,54 @@ describe('environment configuration', () => {
     expect((result.value as { SEED_ENABLED: boolean }).SEED_ENABLED).toBe(
       false,
     );
+  });
+
+  it('defaults Swagger access to disabled', () => {
+    const result = environmentValidationSchema.validate({
+      PORT: 4000,
+      APP_URL: 'http://localhost:4000',
+      FRONTEND_URL: 'http://localhost:3000',
+      DATABASE_URL: 'mysql://dowinn:dowinn@127.0.0.1:3308/dowinn',
+      JWT_ACCESS_SECRET: 'development-access-secret-123',
+      JWT_REFRESH_SECRET: 'development-refresh-secret-123',
+      NODE_ENV: 'development',
+    });
+
+    expect((result.value as { SWAGGER_ENABLED: boolean }).SWAGGER_ENABLED).toBe(
+      false,
+    );
+  });
+
+  it('loads APP_ENV-specific files before NODE_ENV fallbacks', () => {
+    process.env = {
+      ...originalEnv,
+      APP_ENV: 'staging',
+      NODE_ENV: 'production',
+    };
+
+    expect(getEnvironmentFilePaths()).toEqual([
+      '.env.staging.local',
+      '.env.staging',
+      '.env.production.local',
+      '.env.production',
+      '.env.local',
+      '.env',
+    ]);
+  });
+
+  it('treats APP_ENV=local as the plain .env.local file', () => {
+    process.env = {
+      ...originalEnv,
+      APP_ENV: 'local',
+      NODE_ENV: 'development',
+    };
+
+    expect(getEnvironmentFilePaths()).toEqual([
+      '.env.local',
+      '.env.development.local',
+      '.env.development',
+      '.env',
+    ]);
   });
 
   it('defaults secure refresh cookies on production when the override is absent', () => {

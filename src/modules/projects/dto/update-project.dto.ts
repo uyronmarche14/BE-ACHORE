@@ -1,3 +1,4 @@
+import { ApiHideProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsDefined,
@@ -34,6 +35,7 @@ export class UpdateProjectDto {
     (object: UpdateProjectDto) =>
       object.name === undefined && object.description === undefined,
   )
+  @ApiHideProperty()
   @IsDefined({
     message: 'At least one of name or description must be provided',
   })

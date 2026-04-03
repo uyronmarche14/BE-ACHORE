@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Post, Body, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiEnvelopedResponse } from '../../../common/swagger/decorators/api-enveloped-response.decorator';
+import {
+  ApiInviteTokenParam,
+  ApiProjectIdParam,
+} from '../../../common/swagger/decorators/api-parameter.decorators';
+import { ApiStandardErrorResponses } from '../../../common/swagger/decorators/api-standard-error-responses.decorator';
+import { SWAGGER_BEARER_AUTH_NAME } from '../../../common/swagger/swagger.constants';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { RequireProjectAccess } from '../../auth/decorators/resource-access.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -11,7 +19,13 @@ import type {
   CreateProjectInviteResponse,
   InvitePreviewResponse,
 } from '../types/project-invite-response.type';
+import {
+  SwaggerAcceptInviteResponseDto,
+  SwaggerCreateProjectInviteResponseDto,
+  SwaggerInvitePreviewResponseDto,
+} from '../swagger/project-invite-response.models';
 
+@ApiTags('Project Invites')
 @Controller()
 export class ProjectInvitesController {
   constructor(private readonly projectInvitesService: ProjectInvitesService) {}
@@ -21,6 +35,17 @@ export class ProjectInvitesController {
   @RequireProjectAccess({
     ownerOnly: true,
   })
+  @ApiOperation({
+    summary: 'Create a project invite and send the email.',
+  })
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
+  @ApiProjectIdParam()
+  @ApiEnvelopedResponse({
+    status: 201,
+    description: 'Invite created successfully.',
+    type: SwaggerCreateProjectInviteResponseDto,
+  })
+  @ApiStandardErrorResponses([400, 401, 403, 404, 409])
   createInvite(
     @CurrentUser() currentUser: AuthUserResponse,
     @Param('projectId') projectId: string,
@@ -34,12 +59,32 @@ export class ProjectInvitesController {
   }
 
   @Get('invites/:token')
+  @ApiOperation({
+    summary: 'Preview an invite before accepting it.',
+  })
+  @ApiInviteTokenParam()
+  @ApiEnvelopedResponse({
+    description: 'Invite preview loaded successfully.',
+    type: SwaggerInvitePreviewResponseDto,
+  })
+  @ApiStandardErrorResponses([404])
   previewInvite(@Param('token') token: string): Promise<InvitePreviewResponse> {
     return this.projectInvitesService.previewInvite(token);
   }
 
   @Post('invites/:token/accept')
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Accept an invite for the current authenticated user.',
+  })
+  @ApiInviteTokenParam()
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
+  @ApiEnvelopedResponse({
+    status: 201,
+    description: 'Invite accepted successfully.',
+    type: SwaggerAcceptInviteResponseDto,
+  })
+  @ApiStandardErrorResponses([401, 403, 404, 409])
   acceptInvite(
     @Param('token') token: string,
     @CurrentUser() currentUser: AuthUserResponse,

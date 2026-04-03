@@ -1,3 +1,4 @@
+import { ApiHideProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsDateString,
@@ -51,6 +52,7 @@ export class UpdateTaskDto {
       object.assigneeId === undefined &&
       object.dueDate === undefined,
   )
+  @ApiHideProperty()
   @IsDefined({
     message:
       'At least one of title, description, assigneeId, or dueDate must be provided',

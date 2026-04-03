@@ -8,7 +8,19 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Request, Response } from 'express';
+import { ApiEnvelopedResponse } from '../../../common/swagger/decorators/api-enveloped-response.decorator';
+import { ApiStandardErrorResponses } from '../../../common/swagger/decorators/api-standard-error-responses.decorator';
+import {
+  SWAGGER_BEARER_AUTH_NAME,
+  SWAGGER_REFRESH_COOKIE_AUTH_NAME,
+} from '../../../common/swagger/swagger.constants';
 import { AuthRateLimit } from '../decorators/auth-rate-limit.decorator';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { LoginDto } from '../dto/login.dto';
@@ -43,7 +55,17 @@ import {
 } from '../utils/refresh-cookie.util';
 import { ResendVerificationDto } from '../dto/resend-verification.dto';
 import { VerifyEmailConfirmDto } from '../dto/verify-email-confirm.dto';
+import {
+  SwaggerAuthSessionResponseDto,
+  SwaggerCurrentUserResponseDto,
+  SwaggerLogoutResponseDto,
+  SwaggerRefreshAccessTokenResponseDto,
+  SwaggerResendVerificationResponseDto,
+  SwaggerSignupResponseDto,
+  SwaggerVerifyEmailConfirmResponseDto,
+} from '../swagger/auth-response.models';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -58,6 +80,15 @@ export class AuthController {
     limit: 5,
     windowMs: 60_000,
   })
+  @ApiOperation({
+    summary: 'Create a new account and trigger email verification.',
+  })
+  @ApiEnvelopedResponse({
+    status: 201,
+    description: 'Account created successfully.',
+    type: SwaggerSignupResponseDto,
+  })
+  @ApiStandardErrorResponses([400, 409, 429])
   async signup(
     @Body() signupDto: SignupDto,
     @Res({ passthrough: true }) response: Response,
@@ -76,6 +107,15 @@ export class AuthController {
     limit: 5,
     windowMs: 60_000,
   })
+  @ApiOperation({
+    summary: 'Log in with email and password.',
+  })
+  @ApiEnvelopedResponse({
+    status: 201,
+    description: 'Authentication succeeded.',
+    type: SwaggerAuthSessionResponseDto,
+  })
+  @ApiStandardErrorResponses([400, 401, 403, 429])
   async login(
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) response: Response,
@@ -99,6 +139,16 @@ export class AuthController {
     limit: 20,
     windowMs: 60_000,
   })
+  @ApiOperation({
+    summary: 'Rotate the refresh cookie and issue a new access token.',
+  })
+  @ApiCookieAuth(SWAGGER_REFRESH_COOKIE_AUTH_NAME)
+  @ApiEnvelopedResponse({
+    status: 201,
+    description: 'Access token refreshed successfully.',
+    type: SwaggerRefreshAccessTokenResponseDto,
+  })
+  @ApiStandardErrorResponses([401, 429])
   async refresh(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
@@ -121,6 +171,15 @@ export class AuthController {
   }
 
   @Post('logout')
+  @ApiOperation({
+    summary: 'Revoke the current refresh token and clear the session cookie.',
+  })
+  @ApiCookieAuth(SWAGGER_REFRESH_COOKIE_AUTH_NAME)
+  @ApiEnvelopedResponse({
+    status: 201,
+    description: 'Logged out successfully.',
+    type: SwaggerLogoutResponseDto,
+  })
   async logout(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
@@ -143,6 +202,15 @@ export class AuthController {
     limit: 10,
     windowMs: 60_000,
   })
+  @ApiOperation({
+    summary: 'Confirm an email verification token.',
+  })
+  @ApiEnvelopedResponse({
+    status: 201,
+    description: 'Email verified successfully.',
+    type: SwaggerVerifyEmailConfirmResponseDto,
+  })
+  @ApiStandardErrorResponses([400, 404, 429])
   confirmEmailVerification(
     @Body() verifyEmailConfirmDto: VerifyEmailConfirmDto,
   ): Promise<VerifyEmailConfirmResponse> {
@@ -158,6 +226,15 @@ export class AuthController {
     limit: 5,
     windowMs: 60_000,
   })
+  @ApiOperation({
+    summary: 'Resend the email verification link when needed.',
+  })
+  @ApiEnvelopedResponse({
+    status: 201,
+    description: 'Verification email resend request accepted.',
+    type: SwaggerResendVerificationResponseDto,
+  })
+  @ApiStandardErrorResponses([400, 429])
   resendEmailVerification(
     @Body() resendVerificationDto: ResendVerificationDto,
   ): Promise<ResendVerificationResponse> {
@@ -168,6 +245,15 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Return the currently authenticated user profile.',
+  })
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
+  @ApiEnvelopedResponse({
+    description: 'Current user loaded successfully.',
+    type: SwaggerCurrentUserResponseDto,
+  })
+  @ApiStandardErrorResponses([401])
   getCurrentUser(
     @CurrentUser() currentUser: AuthUserResponse,
   ): CurrentUserResponse {
