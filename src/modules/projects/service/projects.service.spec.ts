@@ -149,6 +149,7 @@ describe('ProjectsService', () => {
           name: 'Todo',
           position: 1,
           isClosed: false,
+          color: 'SLATE',
           taskCount: 0,
         },
         {
@@ -156,6 +157,7 @@ describe('ProjectsService', () => {
           name: 'In Progress',
           position: 2,
           isClosed: false,
+          color: 'BLUE',
           taskCount: 0,
         },
         {
@@ -163,6 +165,7 @@ describe('ProjectsService', () => {
           name: 'Done',
           position: 3,
           isClosed: true,
+          color: 'GREEN',
           taskCount: 0,
         },
       ],
@@ -243,6 +246,7 @@ describe('ProjectsService', () => {
               name: 'Todo',
               position: 1,
               isClosed: false,
+              color: 'SLATE',
               taskCount: 1,
             },
             {
@@ -250,6 +254,7 @@ describe('ProjectsService', () => {
               name: 'Done',
               position: 3,
               isClosed: true,
+              color: 'GREEN',
               taskCount: 1,
             },
           ],
@@ -265,6 +270,7 @@ describe('ProjectsService', () => {
               name: 'In Progress',
               position: 2,
               isClosed: false,
+              color: 'BLUE',
               taskCount: 1,
             },
           ],
@@ -304,6 +310,7 @@ describe('ProjectsService', () => {
               name: 'Todo',
               position: 1,
               isClosed: false,
+              color: 'SLATE',
               taskCount: 0,
             },
             {
@@ -311,6 +318,7 @@ describe('ProjectsService', () => {
               name: 'In Progress',
               position: 2,
               isClosed: false,
+              color: 'BLUE',
               taskCount: 0,
             },
             {
@@ -318,6 +326,7 @@ describe('ProjectsService', () => {
               name: 'Done',
               position: 3,
               isClosed: true,
+              color: 'GREEN',
               taskCount: 0,
             },
           ],
@@ -440,22 +449,29 @@ describe('ProjectsService', () => {
           name: 'Todo',
           position: 1,
           isClosed: false,
+          color: 'SLATE',
           tasks: [
             {
               id: 'task-1',
               projectId: 'project-1',
               title: 'Draft launch checklist',
               description: 'Capture release requirements',
+              acceptanceCriteria: null,
+              notes: null,
+              parentTaskId: null,
               statusId: 'status-todo',
               status: {
                 id: 'status-todo',
                 name: 'Todo',
                 position: 1,
                 isClosed: false,
+                color: 'SLATE',
               },
               position: 1,
               assigneeId: null,
               dueDate: '2026-04-08',
+              links: [],
+              checklistItems: [],
               createdAt: '2026-04-01T09:00:00.000Z',
               updatedAt: '2026-04-01T10:00:00.000Z',
             },
@@ -464,16 +480,22 @@ describe('ProjectsService', () => {
               projectId: 'project-1',
               title: 'Finalize QA',
               description: null,
+              acceptanceCriteria: null,
+              notes: null,
+              parentTaskId: null,
               statusId: 'status-todo',
               status: {
                 id: 'status-todo',
                 name: 'Todo',
                 position: 1,
                 isClosed: false,
+                color: 'SLATE',
               },
               position: null,
               assigneeId: null,
               dueDate: null,
+              links: [],
+              checklistItems: [],
               createdAt: '2026-04-03T09:00:00.000Z',
               updatedAt: '2026-04-03T09:00:00.000Z',
             },
@@ -484,22 +506,29 @@ describe('ProjectsService', () => {
           name: 'In Progress',
           position: 2,
           isClosed: false,
+          color: 'BLUE',
           tasks: [
             {
               id: 'task-2',
               projectId: 'project-1',
               title: 'Ship assets',
               description: 'Coordinate release files',
+              acceptanceCriteria: null,
+              notes: null,
+              parentTaskId: null,
               statusId: 'status-progress',
               status: {
                 id: 'status-progress',
                 name: 'In Progress',
                 position: 2,
                 isClosed: false,
+                color: 'BLUE',
               },
               position: 2,
               assigneeId: 'member-1',
               dueDate: '2026-04-10',
+              links: [],
+              checklistItems: [],
               createdAt: '2026-04-02T09:00:00.000Z',
               updatedAt: '2026-04-02T10:00:00.000Z',
             },
@@ -510,6 +539,7 @@ describe('ProjectsService', () => {
           name: 'Done',
           position: 3,
           isClosed: true,
+          color: 'GREEN',
           tasks: [],
         },
       ],
@@ -528,6 +558,7 @@ describe('ProjectsService', () => {
       name: 'Review',
       position: 4,
       isClosed: false,
+      color: 'BLUE',
     });
 
     const result = await projectsService.createProjectStatus('project-1', {
@@ -559,12 +590,14 @@ describe('ProjectsService', () => {
         name: 'Review',
         position: 4,
         isClosed: false,
+        color: 'BLUE',
       },
       select: {
         id: true,
         name: true,
         position: true,
         isClosed: true,
+        color: true,
       },
     });
     expect(result).toEqual({
@@ -572,6 +605,7 @@ describe('ProjectsService', () => {
       name: 'Review',
       position: 4,
       isClosed: false,
+      color: 'BLUE',
       taskCount: 0,
     });
   });
@@ -629,6 +663,7 @@ describe('ProjectsService', () => {
           name: 'Done',
           position: 3,
           isClosed: true,
+          color: 'GREEN',
           taskCount: 1,
         },
       ],
@@ -652,6 +687,7 @@ function createStatusRecord(
     name: string;
     position: number;
     isClosed: boolean;
+    color: string;
   }> = {},
 ) {
   return {
@@ -659,6 +695,13 @@ function createStatusRecord(
     name: overrides.name ?? 'Todo',
     position: overrides.position ?? 1,
     isClosed: overrides.isClosed ?? false,
+    color:
+      overrides.color ??
+      (overrides.isClosed
+        ? 'GREEN'
+        : (overrides.id ?? 'status-todo') === 'status-progress'
+          ? 'BLUE'
+          : 'SLATE'),
   };
 }
 
@@ -668,6 +711,7 @@ function createProjectSummaryStatusRecord(
     name: string;
     position: number;
     isClosed: boolean;
+    color: string;
     tasks: Array<{ id: string }>;
   }> = {},
 ) {
@@ -676,6 +720,13 @@ function createProjectSummaryStatusRecord(
     name: overrides.name ?? 'Todo',
     position: overrides.position ?? 1,
     isClosed: overrides.isClosed ?? false,
+    color:
+      overrides.color ??
+      (overrides.isClosed
+        ? 'GREEN'
+        : (overrides.id ?? 'status-todo') === 'status-progress'
+          ? 'BLUE'
+          : 'SLATE'),
     tasks: overrides.tasks ?? [],
   };
 }
@@ -721,11 +772,26 @@ function createProjectTaskRecord(
     projectId: string;
     title: string;
     description: string | null;
+    acceptanceCriteria: string | null;
+    notes: string | null;
+    parentTaskId: string | null;
     statusId: string;
     status: ReturnType<typeof createStatusRecord>;
     position: number | null;
     assigneeId: string | null;
     dueDate: Date | null;
+    links: Array<{
+      id: string;
+      label: string;
+      url: string;
+      position: number;
+    }>;
+    checklistItems: Array<{
+      id: string;
+      label: string;
+      isCompleted: boolean;
+      position: number;
+    }>;
     createdAt: Date;
     updatedAt: Date;
   }> = {},
@@ -735,6 +801,9 @@ function createProjectTaskRecord(
     projectId: overrides.projectId ?? 'project-1',
     title: overrides.title ?? 'Task',
     description: overrides.description ?? null,
+    acceptanceCriteria: overrides.acceptanceCriteria ?? null,
+    notes: overrides.notes ?? null,
+    parentTaskId: overrides.parentTaskId ?? null,
     statusId: overrides.statusId ?? 'status-todo',
     status:
       overrides.status ??
@@ -744,6 +813,8 @@ function createProjectTaskRecord(
     position: overrides.position ?? null,
     assigneeId: overrides.assigneeId ?? null,
     dueDate: overrides.dueDate ?? null,
+    links: overrides.links ?? [],
+    checklistItems: overrides.checklistItems ?? [],
     createdAt: overrides.createdAt ?? new Date('2026-04-01T09:00:00.000Z'),
     updatedAt: overrides.updatedAt ?? new Date('2026-04-01T09:00:00.000Z'),
   };
@@ -755,6 +826,7 @@ function createProjectDetailStatusRecord(
     name: string;
     position: number;
     isClosed: boolean;
+    color: string;
     tasks: Array<ReturnType<typeof createProjectTaskRecord>>;
   }> = {},
 ) {
@@ -763,6 +835,13 @@ function createProjectDetailStatusRecord(
     name: overrides.name ?? 'Todo',
     position: overrides.position ?? 1,
     isClosed: overrides.isClosed ?? false,
+    color:
+      overrides.color ??
+      (overrides.isClosed
+        ? 'GREEN'
+        : (overrides.id ?? 'status-todo') === 'status-progress'
+          ? 'BLUE'
+          : 'SLATE'),
     tasks: overrides.tasks ?? [],
   };
 }

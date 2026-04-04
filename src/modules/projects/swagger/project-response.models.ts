@@ -1,4 +1,8 @@
-import { ProjectMemberRole, TaskLogEventType } from '@prisma/client';
+import {
+  ProjectMemberRole,
+  ProjectStatusColor,
+  TaskLogEventType,
+} from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 import { SwaggerProjectTaskStatusDto } from '../../tasks/swagger/task-response.models';
 import {
@@ -28,9 +32,22 @@ export class SwaggerProjectStatusSummaryDto {
   isClosed!: boolean;
 
   @ApiProperty({
+    enum: ProjectStatusColor,
+    example: ProjectStatusColor.BLUE,
+  })
+  color!: ProjectStatusColor;
+
+  @ApiProperty({
     example: 3,
   })
   taskCount!: number;
+}
+
+export class SwaggerProjectStatusListResponseDto {
+  @ApiProperty({
+    type: () => [SwaggerProjectStatusSummaryDto],
+  })
+  items!: SwaggerProjectStatusSummaryDto[];
 }
 
 export class SwaggerProjectSummaryResponseDto {

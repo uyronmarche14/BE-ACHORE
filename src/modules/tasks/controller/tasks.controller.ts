@@ -25,16 +25,31 @@ import {
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { ResourceAccessGuard } from '../../auth/guards/resource-access.guard';
 import type { AuthUserResponse } from '../../auth/types/auth-response.type';
+import { CreateTaskAttachmentDto } from '../dto/create-task-attachment.dto';
+import { CreateTaskCommentDto } from '../dto/create-task-comment.dto';
 import { CreateTaskDto } from '../dto/create-task.dto';
+import { UpdateTaskCommentDto } from '../dto/update-task-comment.dto';
 import { UpdateTaskDto } from '../dto/update-task.dto';
 import { UpdateTaskStatusDto } from '../dto/update-task-status.dto';
+import { TaskAttachmentsService } from '../service/task-attachments.service';
+import { TaskCommentsService } from '../service/task-comments.service';
 import { TasksService } from '../service/tasks.service';
 import type {
   DeleteTaskResponse,
   ProjectTasksResponse,
+  TaskActionResponse,
+  TaskAttachmentResponse,
+  TaskAttachmentsResponse,
+  TaskCommentResponse,
+  TaskCommentsResponse,
   TaskResponse,
 } from '../types/task-response.type';
 import {
+  SwaggerTaskActionResponseDto,
+  SwaggerTaskAttachmentResponseDto,
+  SwaggerTaskAttachmentsResponseDto,
+  SwaggerTaskCommentResponseDto,
+  SwaggerTaskCommentsResponseDto,
   SwaggerDeleteTaskResponseDto,
   SwaggerProjectTasksResponseDto,
   SwaggerTaskResponseDto,
@@ -44,7 +59,11 @@ import {
 @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
 @Controller()
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) {}
+  constructor(
+    private readonly tasksService: TasksService,
+    private readonly taskCommentsService: TaskCommentsService,
+    private readonly taskAttachmentsService: TaskAttachmentsService,
+  ) {}
 
   @Get('projects/:projectId/tasks')
   @UseGuards(JwtAuthGuard, ResourceAccessGuard)
@@ -142,6 +161,166 @@ export class TasksController {
       currentUser,
       taskId,
       updateTaskStatusDto,
+    );
+  }
+
+  @Get('tasks/:taskId/comments')
+  @UseGuards(JwtAuthGuard, ResourceAccessGuard)
+  @RequireTaskAccess()
+  @ApiOperation({
+    summary: 'List task comments.',
+  })
+  @ApiTaskIdParam()
+  @ApiEnvelopedResponse({
+    description: 'Task comments loaded successfully.',
+    type: SwaggerTaskCommentsResponseDto,
+  })
+  @ApiStandardErrorResponses([401, 403, 404])
+  listTaskComments(
+    @Param('taskId') taskId: string,
+  ): Promise<TaskCommentsResponse> {
+    return this.taskCommentsService.listTaskComments(taskId);
+  }
+
+  @Post('tasks/:taskId/comments')
+  @UseGuards(JwtAuthGuard, ResourceAccessGuard)
+  @RequireTaskAccess()
+  @ApiOperation({
+    summary: 'Create a task comment.',
+  })
+  @ApiTaskIdParam()
+  @ApiEnvelopedResponse({
+    status: 201,
+    description: 'Task comment created successfully.',
+    type: SwaggerTaskCommentResponseDto,
+  })
+  @ApiStandardErrorResponses([400, 401, 403, 404])
+  createTaskComment(
+    @CurrentUser() currentUser: AuthUserResponse,
+    @Param('taskId') taskId: string,
+    @Body() createTaskCommentDto: CreateTaskCommentDto,
+  ): Promise<TaskCommentResponse> {
+    return this.taskCommentsService.createTaskComment(
+      currentUser,
+      taskId,
+      createTaskCommentDto,
+    );
+  }
+
+  @Patch('tasks/:taskId/comments/:commentId')
+  @UseGuards(JwtAuthGuard, ResourceAccessGuard)
+  @RequireTaskAccess()
+  @ApiOperation({
+    summary: 'Update a task comment.',
+  })
+  @ApiTaskIdParam()
+  @ApiEnvelopedResponse({
+    description: 'Task comment updated successfully.',
+    type: SwaggerTaskCommentResponseDto,
+  })
+  @ApiStandardErrorResponses([400, 401, 403, 404])
+  updateTaskComment(
+    @CurrentUser() currentUser: AuthUserResponse,
+    @Param('taskId') taskId: string,
+    @Param('commentId') commentId: string,
+    @Body() updateTaskCommentDto: UpdateTaskCommentDto,
+  ): Promise<TaskCommentResponse> {
+    return this.taskCommentsService.updateTaskComment(
+      currentUser,
+      taskId,
+      commentId,
+      updateTaskCommentDto,
+    );
+  }
+
+  @Delete('tasks/:taskId/comments/:commentId')
+  @UseGuards(JwtAuthGuard, ResourceAccessGuard)
+  @RequireTaskAccess()
+  @ApiOperation({
+    summary: 'Delete a task comment.',
+  })
+  @ApiTaskIdParam()
+  @ApiEnvelopedResponse({
+    description: 'Task comment deleted successfully.',
+    type: SwaggerTaskActionResponseDto,
+  })
+  @ApiStandardErrorResponses([401, 403, 404])
+  deleteTaskComment(
+    @CurrentUser() currentUser: AuthUserResponse,
+    @Param('taskId') taskId: string,
+    @Param('commentId') commentId: string,
+  ): Promise<TaskActionResponse> {
+    return this.taskCommentsService.deleteTaskComment(
+      currentUser,
+      taskId,
+      commentId,
+    );
+  }
+
+  @Get('tasks/:taskId/attachments')
+  @UseGuards(JwtAuthGuard, ResourceAccessGuard)
+  @RequireTaskAccess()
+  @ApiOperation({
+    summary: 'List task attachments.',
+  })
+  @ApiTaskIdParam()
+  @ApiEnvelopedResponse({
+    description: 'Task attachments loaded successfully.',
+    type: SwaggerTaskAttachmentsResponseDto,
+  })
+  @ApiStandardErrorResponses([401, 403, 404])
+  listTaskAttachments(
+    @Param('taskId') taskId: string,
+  ): Promise<TaskAttachmentsResponse> {
+    return this.taskAttachmentsService.listTaskAttachments(taskId);
+  }
+
+  @Post('tasks/:taskId/attachments')
+  @UseGuards(JwtAuthGuard, ResourceAccessGuard)
+  @RequireTaskAccess()
+  @ApiOperation({
+    summary: 'Create a URL-backed task attachment.',
+  })
+  @ApiTaskIdParam()
+  @ApiEnvelopedResponse({
+    status: 201,
+    description: 'Task attachment created successfully.',
+    type: SwaggerTaskAttachmentResponseDto,
+  })
+  @ApiStandardErrorResponses([400, 401, 403, 404])
+  createTaskAttachment(
+    @CurrentUser() currentUser: AuthUserResponse,
+    @Param('taskId') taskId: string,
+    @Body() createTaskAttachmentDto: CreateTaskAttachmentDto,
+  ): Promise<TaskAttachmentResponse> {
+    return this.taskAttachmentsService.createTaskAttachment(
+      currentUser,
+      taskId,
+      createTaskAttachmentDto,
+    );
+  }
+
+  @Delete('tasks/:taskId/attachments/:attachmentId')
+  @UseGuards(JwtAuthGuard, ResourceAccessGuard)
+  @RequireTaskAccess()
+  @ApiOperation({
+    summary: 'Delete a task attachment.',
+  })
+  @ApiTaskIdParam()
+  @ApiEnvelopedResponse({
+    description: 'Task attachment deleted successfully.',
+    type: SwaggerTaskActionResponseDto,
+  })
+  @ApiStandardErrorResponses([401, 403, 404])
+  deleteTaskAttachment(
+    @CurrentUser() currentUser: AuthUserResponse,
+    @Param('taskId') taskId: string,
+    @Param('attachmentId') attachmentId: string,
+  ): Promise<TaskActionResponse> {
+    return this.taskAttachmentsService.deleteTaskAttachment(
+      currentUser,
+      taskId,
+      attachmentId,
     );
   }
 

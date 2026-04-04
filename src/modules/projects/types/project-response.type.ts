@@ -1,11 +1,21 @@
-import { Prisma, ProjectMemberRole, TaskLogEventType } from '@prisma/client';
+import {
+  Prisma,
+  ProjectMemberRole,
+  ProjectStatusColor,
+  TaskLogEventType,
+} from '@prisma/client';
 import type { TaskLogValue } from '../../task-logs/types/task-log-response.type';
+import type {
+  TaskChecklistItemResponse,
+  TaskLinkResponse,
+} from '../../tasks/types/task-response.type';
 
 export type ProjectStatusSummaryResponse = {
   id: string;
   name: string;
   position: number;
   isClosed: boolean;
+  color: ProjectStatusColor;
   taskCount: number;
 };
 
@@ -19,6 +29,10 @@ export type ProjectSummaryResponse = {
 
 export type ProjectListResponse = {
   items: ProjectSummaryResponse[];
+};
+
+export type ProjectStatusListResponse = {
+  items: ProjectStatusSummaryResponse[];
 };
 
 export type ProjectMemberResponse = {
@@ -40,16 +54,22 @@ export type ProjectTaskCardResponse = {
   projectId: string;
   title: string;
   description: string | null;
+  acceptanceCriteria: string | null;
+  notes: string | null;
+  parentTaskId: string | null;
   statusId: string;
   status: {
     id: string;
     name: string;
     position: number;
     isClosed: boolean;
+    color: ProjectStatusColor;
   };
   position: number | null;
   assigneeId: string | null;
   dueDate: string | null;
+  links: TaskLinkResponse[];
+  checklistItems: TaskChecklistItemResponse[];
   createdAt: string;
   updatedAt: string;
 };
@@ -99,6 +119,7 @@ export type ProjectSummaryStatusRecord = {
   name: string;
   position: number;
   isClosed: boolean;
+  color: ProjectStatusColor;
   tasks: Array<{
     id: string;
   }>;
@@ -125,6 +146,7 @@ export type ProjectDetailTaskStatusRecord = {
   name: string;
   position: number;
   isClosed: boolean;
+  color: ProjectStatusColor;
   tasks: ProjectDetailTaskRecord[];
 };
 
@@ -133,16 +155,22 @@ export type ProjectDetailTaskRecord = {
   projectId: string;
   title: string;
   description: string | null;
+  acceptanceCriteria: string | null;
+  notes: string | null;
+  parentTaskId: string | null;
   statusId: string;
   status: {
     id: string;
     name: string;
     position: number;
     isClosed: boolean;
+    color: ProjectStatusColor;
   };
   position: number | null;
   assigneeId: string | null;
   dueDate: Date | null;
+  links: TaskLinkResponse[];
+  checklistItems: TaskChecklistItemResponse[];
   createdAt: Date;
   updatedAt: Date;
 };

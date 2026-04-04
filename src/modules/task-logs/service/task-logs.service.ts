@@ -37,7 +37,15 @@ type CreateStatusChangedLogParams = {
 };
 
 export type TaskLogFieldChange = {
-  fieldName: 'title' | 'description' | 'assigneeId' | 'dueDate';
+  fieldName:
+    | 'title'
+    | 'description'
+    | 'acceptanceCriteria'
+    | 'notes'
+    | 'assigneeId'
+    | 'dueDate'
+    | 'links'
+    | 'checklistItems';
   oldValue: TaskLogValue;
   newValue: TaskLogValue;
 };
@@ -224,6 +232,18 @@ function getTaskFieldLabel(fieldName: TaskLogFieldChange['fieldName']) {
 
   if (fieldName === 'dueDate') {
     return 'due date';
+  }
+
+  if (fieldName === 'acceptanceCriteria') {
+    return 'acceptance criteria';
+  }
+
+  if (fieldName === 'checklistItems') {
+    return 'checklist';
+  }
+
+  if (fieldName === 'links') {
+    return 'links';
   }
 
   return fieldName;

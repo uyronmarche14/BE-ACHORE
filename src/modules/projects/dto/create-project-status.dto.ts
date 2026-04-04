@@ -1,6 +1,8 @@
+import { ProjectStatusColor } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -19,4 +21,8 @@ export class CreateProjectStatusDto {
   @IsOptional()
   @IsBoolean()
   isClosed?: boolean;
+
+  @IsOptional()
+  @IsEnum(ProjectStatusColor)
+  color?: ProjectStatusColor;
 }

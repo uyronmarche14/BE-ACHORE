@@ -24,6 +24,8 @@ import type {
   TaskResponse,
 } from '../types/task-response.type';
 
+type TaskClient = Prisma.TransactionClient | PrismaService;
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -36,23 +38,47 @@ export class TasksService {
     projectId: string,
     createTaskDto: CreateTaskDto,
   ): Promise<TaskResponse> {
-    await this.assertValidAssignee(projectId, createTaskDto.assigneeId);
+    await Promise.all([
+      this.assertValidAssignee(projectId, createTaskDto.assigneeId),
+      this.assertValidParentTask(projectId, createTaskDto.parentTaskId),
+    ]);
 
     return this.prismaService.$transaction(async (transactionClient) => {
       const status = createTaskDto.statusId
-        ? await this.assertValidStatus(projectId, createTaskDto.statusId)
+        ? await this.assertValidStatus(
+            projectId,
+            createTaskDto.statusId,
+            transactionClient,
+          )
         : await this.getDefaultStatus(transactionClient, projectId);
       const createdTask = await transactionClient.task.create({
         data: {
           projectId,
           title: createTaskDto.title,
           description: createTaskDto.description ?? null,
+          acceptanceCriteria: createTaskDto.acceptanceCriteria ?? null,
+          notes: createTaskDto.notes ?? null,
+          parentTaskId: createTaskDto.parentTaskId ?? null,
           statusId: status.id,
           assigneeId: createTaskDto.assigneeId ?? null,
           dueDate: createTaskDto.dueDate
             ? new Date(createTaskDto.dueDate)
             : null,
           createdById: currentUser.id,
+          links: {
+            create: createTaskDto.links?.map((link, index) => ({
+              label: link.label,
+              url: link.url,
+              position: index + 1,
+            })),
+          },
+          checklistItems: {
+            create: createTaskDto.checklistItems?.map((item, index) => ({
+              label: item.label,
+              isCompleted: item.isCompleted ?? false,
+              position: index + 1,
+            })),
+          },
         },
         select: taskResponseSelect,
       });
@@ -131,6 +157,16 @@ export class TasksService {
                   description: updateTaskDto.description,
                 }
               : {}),
+            ...(updateTaskDto.acceptanceCriteria !== undefined
+              ? {
+                  acceptanceCriteria: updateTaskDto.acceptanceCriteria,
+                }
+              : {}),
+            ...(updateTaskDto.notes !== undefined
+              ? {
+                  notes: updateTaskDto.notes,
+                }
+              : {}),
             ...(updateTaskDto.assigneeId !== undefined
               ? {
                   assigneeId: updateTaskDto.assigneeId,
@@ -141,6 +177,30 @@ export class TasksService {
                   dueDate: updateTaskDto.dueDate
                     ? new Date(updateTaskDto.dueDate)
                     : null,
+                }
+              : {}),
+            ...(updateTaskDto.links !== undefined
+              ? {
+                  links: {
+                    deleteMany: {},
+                    create: updateTaskDto.links.map((link, index) => ({
+                      label: link.label,
+                      url: link.url,
+                      position: index + 1,
+                    })),
+                  },
+                }
+              : {}),
+            ...(updateTaskDto.checklistItems !== undefined
+              ? {
+                  checklistItems: {
+                    deleteMany: {},
+                    create: updateTaskDto.checklistItems.map((item, index) => ({
+                      label: item.label,
+                      isCompleted: item.isCompleted ?? false,
+                      position: index + 1,
+                    })),
+                  },
                 }
               : {}),
             updatedById: currentUser.id,
@@ -263,12 +323,7 @@ export class TasksService {
       orderBy: {
         position: 'asc',
       },
-      select: {
-        id: true,
-        name: true,
-        position: true,
-        isClosed: true,
-      },
+      select: taskStatusSelect,
     });
 
     if (!status) {
@@ -313,18 +368,45 @@ export class TasksService {
     }
   }
 
-  private async assertValidStatus(projectId: string, statusId: string) {
-    const status = await this.prismaService.projectStatus.findFirst({
+  private async assertValidParentTask(
+    projectId: string,
+    parentTaskId?: string | null,
+  ) {
+    if (!parentTaskId) {
+      return;
+    }
+
+    const parentTask = await this.prismaService.task.findFirst({
       where: {
-        id: statusId,
+        id: parentTaskId,
         projectId,
       },
       select: {
         id: true,
-        name: true,
-        position: true,
-        isClosed: true,
       },
+    });
+
+    if (!parentTask) {
+      throw createValidationException({
+        message: 'Request validation failed',
+        details: {
+          parentTaskId: ['Parent task must belong to the same project'],
+        },
+      });
+    }
+  }
+
+  private async assertValidStatus(
+    projectId: string,
+    statusId: string,
+    prismaClient: TaskClient = this.prismaService,
+  ) {
+    const status = await prismaClient.projectStatus.findFirst({
+      where: {
+        id: statusId,
+        projectId,
+      },
+      select: taskStatusSelect,
     });
 
     if (!status) {
@@ -347,12 +429,7 @@ export class TasksService {
 
   private async buildTaskUpdateChanges(
     transactionClient: Prisma.TransactionClient,
-    existingTask: {
-      title: string;
-      description: string | null;
-      assigneeId: string | null;
-      dueDate: Date | null;
-    },
+    existingTask: UpdateTaskComparisonRecord,
     updateTaskDto: UpdateTaskDto,
   ): Promise<TaskLogFieldChange[]> {
     const changes: TaskLogFieldChange[] = [];
@@ -376,6 +453,28 @@ export class TasksService {
         fieldName: 'description',
         oldValue: existingTask.description,
         newValue: updateTaskDto.description,
+      });
+    }
+
+    if (
+      updateTaskDto.acceptanceCriteria !== undefined &&
+      updateTaskDto.acceptanceCriteria !== existingTask.acceptanceCriteria
+    ) {
+      changes.push({
+        fieldName: 'acceptanceCriteria',
+        oldValue: existingTask.acceptanceCriteria,
+        newValue: updateTaskDto.acceptanceCriteria,
+      });
+    }
+
+    if (
+      updateTaskDto.notes !== undefined &&
+      updateTaskDto.notes !== existingTask.notes
+    ) {
+      changes.push({
+        fieldName: 'notes',
+        oldValue: existingTask.notes,
+        newValue: updateTaskDto.notes,
       });
     }
 
@@ -412,22 +511,88 @@ export class TasksService {
       });
     }
 
+    if (updateTaskDto.links !== undefined) {
+      const previousLinksSummary = summarizeLinks(existingTask.links);
+      const nextLinksSummary = summarizeInputLinks(updateTaskDto.links);
+
+      if (previousLinksSummary !== nextLinksSummary) {
+        changes.push({
+          fieldName: 'links',
+          oldValue: previousLinksSummary,
+          newValue: nextLinksSummary,
+        });
+      }
+    }
+
+    if (updateTaskDto.checklistItems !== undefined) {
+      const previousChecklistSummary = summarizeChecklist(
+        existingTask.checklistItems,
+      );
+      const nextChecklistSummary = summarizeInputChecklist(
+        updateTaskDto.checklistItems,
+      );
+
+      if (previousChecklistSummary !== nextChecklistSummary) {
+        changes.push({
+          fieldName: 'checklistItems',
+          oldValue: previousChecklistSummary,
+          newValue: nextChecklistSummary,
+        });
+      }
+    }
+
     return changes;
   }
 }
+
+type UpdateTaskComparisonRecord = {
+  projectId: string;
+  title: string;
+  description: string | null;
+  acceptanceCriteria: string | null;
+  notes: string | null;
+  assigneeId: string | null;
+  dueDate: Date | null;
+  links: Array<{
+    label: string;
+    url: string;
+  }>;
+  checklistItems: Array<{
+    label: string;
+    isCompleted: boolean;
+  }>;
+};
 
 const taskStatusSelect = {
   id: true,
   name: true,
   position: true,
   isClosed: true,
+  color: true,
 } satisfies Prisma.ProjectStatusSelect;
+
+const taskSubtaskSelect = {
+  id: true,
+  title: true,
+  description: true,
+  statusId: true,
+  status: {
+    select: taskStatusSelect,
+  },
+  assigneeId: true,
+  dueDate: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.TaskSelect;
 
 const taskResponseSelect = {
   id: true,
   projectId: true,
   title: true,
   description: true,
+  acceptanceCriteria: true,
+  notes: true,
+  parentTaskId: true,
   statusId: true,
   status: {
     select: taskStatusSelect,
@@ -435,6 +600,34 @@ const taskResponseSelect = {
   position: true,
   assigneeId: true,
   dueDate: true,
+  links: {
+    orderBy: {
+      position: 'asc',
+    },
+    select: {
+      id: true,
+      label: true,
+      url: true,
+      position: true,
+    },
+  },
+  checklistItems: {
+    orderBy: {
+      position: 'asc',
+    },
+    select: {
+      id: true,
+      label: true,
+      isCompleted: true,
+      position: true,
+    },
+  },
+  subtasks: {
+    orderBy: {
+      createdAt: 'asc',
+    },
+    select: taskSubtaskSelect,
+  },
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.TaskSelect;
@@ -444,7 +637,11 @@ const projectTaskStatusSelect = {
   name: true,
   position: true,
   isClosed: true,
+  color: true,
   tasks: {
+    where: {
+      parentTaskId: null,
+    },
     select: taskResponseSelect,
   },
 } satisfies Prisma.ProjectStatusSelect;
@@ -453,8 +650,28 @@ const updateTaskComparisonSelect = {
   projectId: true,
   title: true,
   description: true,
+  acceptanceCriteria: true,
+  notes: true,
   assigneeId: true,
   dueDate: true,
+  links: {
+    orderBy: {
+      position: 'asc',
+    },
+    select: {
+      label: true,
+      url: true,
+    },
+  },
+  checklistItems: {
+    orderBy: {
+      position: 'asc',
+    },
+    select: {
+      label: true,
+      isCompleted: true,
+    },
+  },
 } satisfies Prisma.TaskSelect;
 
 const taskStatusComparisonSelect = {
@@ -479,4 +696,45 @@ function isPrismaRecordNotFoundError(error: unknown) {
 
 function normalizeTaskDueDate(dueDate: Date | null) {
   return dueDate ? dueDate.toISOString().slice(0, 10) : null;
+}
+
+function summarizeLinks(links: Array<{ label: string; url: string }>) {
+  return links.length === 0 ? 'No links' : `${links.length} link(s)`;
+}
+
+function summarizeInputLinks(
+  links: Array<{
+    label: string;
+    url: string;
+  }>,
+) {
+  return links.length === 0 ? 'No links' : `${links.length} link(s)`;
+}
+
+function summarizeChecklist(
+  checklistItems: Array<{ label: string; isCompleted: boolean }>,
+) {
+  if (checklistItems.length === 0) {
+    return 'No checklist items';
+  }
+
+  const completedCount = checklistItems.filter(
+    (item) => item.isCompleted,
+  ).length;
+
+  return `${completedCount}/${checklistItems.length} checklist item(s) complete`;
+}
+
+function summarizeInputChecklist(
+  checklistItems: Array<{ label: string; isCompleted?: boolean }>,
+) {
+  if (checklistItems.length === 0) {
+    return 'No checklist items';
+  }
+
+  const completedCount = checklistItems.filter(
+    (item) => item.isCompleted,
+  ).length;
+
+  return `${completedCount}/${checklistItems.length} checklist item(s) complete`;
 }

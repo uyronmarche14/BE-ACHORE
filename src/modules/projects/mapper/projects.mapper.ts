@@ -58,7 +58,8 @@ export function mapProjectDetailResponse(
         name: status.name,
         position: status.position,
         isClosed: status.isClosed,
-        tasks: [...status.tasks]
+        color: status.color,
+        tasks: [...(status.tasks ?? [])]
           .sort(compareProjectTasksForBoard)
           .map((task) => mapProjectTaskCardResponse(task)),
       }))
@@ -110,6 +111,7 @@ function mapProjectStatusSummaryResponse(
     name: status.name,
     position: status.position,
     isClosed: status.isClosed,
+    color: status.color,
     taskCount: status.tasks.length,
   };
 }
@@ -132,16 +134,32 @@ function mapProjectTaskCardResponse(
     projectId: task.projectId,
     title: task.title,
     description: task.description,
+    acceptanceCriteria: task.acceptanceCriteria,
+    notes: task.notes,
+    parentTaskId: task.parentTaskId,
     statusId: task.statusId,
     status: {
       id: task.status.id,
       name: task.status.name,
       position: task.status.position,
       isClosed: task.status.isClosed,
+      color: task.status.color,
     },
     position: task.position,
     assigneeId: task.assigneeId,
     dueDate: task.dueDate ? task.dueDate.toISOString().slice(0, 10) : null,
+    links: (task.links ?? []).map((link) => ({
+      id: link.id,
+      label: link.label,
+      url: link.url,
+      position: link.position,
+    })),
+    checklistItems: (task.checklistItems ?? []).map((item) => ({
+      id: item.id,
+      label: item.label,
+      isCompleted: item.isCompleted,
+      position: item.position,
+    })),
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
   };
