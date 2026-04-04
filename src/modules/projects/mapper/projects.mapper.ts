@@ -11,10 +11,7 @@ import type {
   ProjectSummaryRecord,
   ProjectSummaryResponse,
   ProjectTaskCardResponse,
-  ProjectTaskCounts,
-  ProjectTaskGroupsRecord,
-  ProjectTaskGroupsResponse,
-  ProjectDetailTaskRecord,
+  ProjectStatusSummaryResponse,
 } from '../types/project-response.type';
 import type { TaskLogValue } from '../../task-logs/types/task-log-response.type';
 
@@ -22,12 +19,6 @@ export function mapProjectSummaryResponse(
   project: ProjectSummaryRecord,
   currentUserId: string,
 ): ProjectSummaryResponse {
-  const taskCounts = createEmptyProjectTaskCounts();
-
-  for (const task of project.tasks) {
-    taskCounts[task.status] += 1;
-  }
-
   return {
     id: project.id,
     name: project.name,
@@ -36,7 +27,9 @@ export function mapProjectSummaryResponse(
       project.ownerId === currentUserId
         ? ProjectMemberRole.OWNER
         : ProjectMemberRole.MEMBER,
-    taskCounts,
+    statuses: project.statuses
+      .map((status) => mapProjectStatusSummaryResponse(status))
+      .sort((left, right) => left.position - right.position),
   };
 }
 
@@ -54,20 +47,22 @@ export function mapProjectListResponse(
 export function mapProjectDetailResponse(
   project: ProjectDetailRecord,
 ): ProjectDetailResponse {
-  const taskGroups = createEmptyProjectTaskGroups();
-
-  for (const status of PROJECT_TASK_STATUSES) {
-    taskGroups[status] = project.taskGroups[status].map((task) =>
-      mapProjectTaskCardResponse(task),
-    );
-  }
-
   return {
     id: project.id,
     name: project.name,
     description: project.description,
     members: project.members.map((member) => mapProjectMemberResponse(member)),
-    taskGroups,
+    statuses: project.statuses
+      .map((status) => ({
+        id: status.id,
+        name: status.name,
+        position: status.position,
+        isClosed: status.isClosed,
+        tasks: [...status.tasks]
+          .sort(compareProjectTasksForBoard)
+          .map((task) => mapProjectTaskCardResponse(task)),
+      }))
+      .sort((left, right) => left.position - right.position),
   };
 }
 
@@ -96,7 +91,9 @@ export function mapProjectActivityResponse(input: {
       task: {
         id: entry.task.id,
         title: entry.task.title,
-        status: entry.task.status,
+        statusId: entry.task.statusId,
+        statusName: entry.task.status.name,
+        isClosed: entry.task.status.isClosed,
       },
     })),
     page: input.page,
@@ -105,31 +102,17 @@ export function mapProjectActivityResponse(input: {
   };
 }
 
-export function createEmptyProjectTaskCounts(): ProjectTaskCounts {
+function mapProjectStatusSummaryResponse(
+  status: ProjectSummaryRecord['statuses'][number],
+): ProjectStatusSummaryResponse {
   return {
-    TODO: 0,
-    IN_PROGRESS: 0,
-    DONE: 0,
+    id: status.id,
+    name: status.name,
+    position: status.position,
+    isClosed: status.isClosed,
+    taskCount: status.tasks.length,
   };
 }
-
-export function createEmptyProjectTaskGroups(): ProjectTaskGroupsResponse {
-  return {
-    TODO: [],
-    IN_PROGRESS: [],
-    DONE: [],
-  };
-}
-
-export function createEmptyProjectTaskGroupRecords(): ProjectTaskGroupsRecord {
-  return {
-    TODO: [],
-    IN_PROGRESS: [],
-    DONE: [],
-  };
-}
-
-const PROJECT_TASK_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE'] as const;
 
 function mapProjectMemberResponse(
   member: ProjectDetailMemberRecord,
@@ -142,20 +125,43 @@ function mapProjectMemberResponse(
 }
 
 function mapProjectTaskCardResponse(
-  task: ProjectDetailTaskRecord,
+  task: ProjectDetailRecord['statuses'][number]['tasks'][number],
 ): ProjectTaskCardResponse {
   return {
     id: task.id,
     projectId: task.projectId,
     title: task.title,
     description: task.description,
-    status: task.status,
+    statusId: task.statusId,
+    status: {
+      id: task.status.id,
+      name: task.status.name,
+      position: task.status.position,
+      isClosed: task.status.isClosed,
+    },
     position: task.position,
     assigneeId: task.assigneeId,
     dueDate: task.dueDate ? task.dueDate.toISOString().slice(0, 10) : null,
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
   };
+}
+
+function compareProjectTasksForBoard(
+  left: ProjectDetailRecord['statuses'][number]['tasks'][number],
+  right: ProjectDetailRecord['statuses'][number]['tasks'][number],
+) {
+  if (left.position !== null && right.position !== null) {
+    if (left.position !== right.position) {
+      return left.position - right.position;
+    }
+  } else if (left.position !== null) {
+    return -1;
+  } else if (right.position !== null) {
+    return 1;
+  }
+
+  return left.createdAt.getTime() - right.createdAt.getTime();
 }
 
 function normalizeTaskLogValue(value: unknown): TaskLogValue {

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, TaskLogEventType, TaskStatus } from '@prisma/client';
+import { Prisma, TaskLogEventType } from '@prisma/client';
 import { createNotFoundException } from '../../../common/utils/api-exception.util';
 import { PrismaService } from '../../../database/prisma.service';
 import { mapTaskLogsResponse } from '../mapper/task-logs.mapper';
@@ -32,8 +32,8 @@ type CreateStatusChangedLogParams = {
   actorName: string;
   createdAt?: Date;
   taskId: string;
-  previousStatus: TaskStatus;
-  nextStatus: TaskStatus;
+  previousStatusName: string;
+  nextStatusName: string;
 };
 
 export type TaskLogFieldChange = {
@@ -130,7 +130,7 @@ export class TaskLogsService {
     prismaClient: TaskLogClient,
     params: CreateStatusChangedLogParams,
   ) {
-    if (params.previousStatus === params.nextStatus) {
+    if (params.previousStatusName === params.nextStatusName) {
       return;
     }
 
@@ -140,11 +140,9 @@ export class TaskLogsService {
         actorId: params.actorId,
         eventType: TaskLogEventType.STATUS_CHANGED,
         fieldName: 'status',
-        oldValue: params.previousStatus,
-        newValue: params.nextStatus,
-        summary: `${params.actorName} moved the task from ${formatTaskStatusLabel(
-          params.previousStatus,
-        )} to ${formatTaskStatusLabel(params.nextStatus)}`,
+        oldValue: params.previousStatusName,
+        newValue: params.nextStatusName,
+        summary: `${params.actorName} moved the task from ${params.previousStatusName} to ${params.nextStatusName}`,
         ...(params.createdAt ? { createdAt: params.createdAt } : {}),
       },
     });
@@ -229,16 +227,4 @@ function getTaskFieldLabel(fieldName: TaskLogFieldChange['fieldName']) {
   }
 
   return fieldName;
-}
-
-function formatTaskStatusLabel(status: TaskStatus) {
-  if (status === TaskStatus.IN_PROGRESS) {
-    return 'In progress';
-  }
-
-  if (status === TaskStatus.DONE) {
-    return 'Done';
-  }
-
-  return 'Todo';
 }

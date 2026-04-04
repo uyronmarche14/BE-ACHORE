@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 import { NotFoundException } from '@nestjs/common';
-import { ProjectMemberRole, TaskStatus } from '@prisma/client';
+import { ProjectMemberRole } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { ProjectsService } from './projects.service';
 
@@ -33,9 +33,15 @@ describe('ProjectsService', () => {
   const transactionClient = {
     project: {
       create: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
     },
     projectMember: {
       create: jest.fn(),
+    },
+    projectStatus: {
+      createMany: jest.fn(),
+      create: jest.fn(),
+      findFirst: jest.fn(),
     },
   };
 
@@ -46,7 +52,8 @@ describe('ProjectsService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
-    projectMember: {
+    projectStatus: {
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -57,7 +64,8 @@ describe('ProjectsService', () => {
       update: jest.Mock;
       delete: jest.Mock;
     };
-    projectMember: {
+    projectStatus: {
+      findFirst: jest.Mock;
       create: jest.Mock;
     };
     $transaction: jest.Mock;
@@ -68,11 +76,17 @@ describe('ProjectsService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     transactionClient.project.create.mockReset();
+    transactionClient.project.findUniqueOrThrow.mockReset();
     transactionClient.projectMember.create.mockReset();
+    transactionClient.projectStatus.createMany.mockReset();
+    transactionClient.projectStatus.create.mockReset();
+    transactionClient.projectStatus.findFirst.mockReset();
     mockPrismaService.project.findMany.mockReset();
     mockPrismaService.project.findUnique.mockReset();
     mockPrismaService.project.update.mockReset();
     mockPrismaService.project.delete.mockReset();
+    mockPrismaService.projectStatus.findFirst.mockReset();
+    mockPrismaService.projectStatus.create.mockReset();
     mockPrismaService.$transaction.mockReset();
     mockPrismaService.$transaction.mockImplementation(
       async (
@@ -86,14 +100,21 @@ describe('ProjectsService', () => {
   it('creates a project and owner membership in one transaction', async () => {
     transactionClient.project.create.mockResolvedValue({
       id: 'project-1',
-      name: 'Launch Website',
-      description: 'Track launch tasks',
-      ownerId: 'owner-1',
-      tasks: [],
     });
     transactionClient.projectMember.create.mockResolvedValue({
       id: 'membership-1',
     });
+    transactionClient.projectStatus.createMany.mockResolvedValue({
+      count: 3,
+    });
+    transactionClient.project.findUniqueOrThrow.mockResolvedValue(
+      createProjectSummaryRecord({
+        id: 'project-1',
+        name: 'Launch Website',
+        description: 'Track launch tasks',
+        ownerId: 'owner-1',
+      }),
+    );
 
     const result = await projectsService.createProject(ownerUser, {
       name: 'Launch Website',
@@ -116,35 +137,75 @@ describe('ProjectsService', () => {
         role: ProjectMemberRole.OWNER,
       },
     });
+    expect(transactionClient.projectStatus.createMany).toHaveBeenCalled();
     expect(result).toEqual({
       id: 'project-1',
       name: 'Launch Website',
       description: 'Track launch tasks',
       role: ProjectMemberRole.OWNER,
-      taskCounts: {
-        TODO: 0,
-        IN_PROGRESS: 0,
-        DONE: 0,
-      },
+      statuses: [
+        {
+          id: 'status-todo',
+          name: 'Todo',
+          position: 1,
+          isClosed: false,
+          taskCount: 0,
+        },
+        {
+          id: 'status-progress',
+          name: 'In Progress',
+          position: 2,
+          isClosed: false,
+          taskCount: 0,
+        },
+        {
+          id: 'status-done',
+          name: 'Done',
+          position: 3,
+          isClosed: true,
+          taskCount: 0,
+        },
+      ],
     });
   });
 
   it('lists only accessible projects for a member user', async () => {
     mockPrismaService.project.findMany.mockResolvedValue([
-      {
+      createProjectSummaryRecord({
         id: 'project-1',
         name: 'Owned Project',
         description: 'Owned description',
         ownerId: 'member-1',
-        tasks: [{ status: TaskStatus.TODO }, { status: TaskStatus.DONE }],
-      },
-      {
+        statuses: [
+          createProjectSummaryStatusRecord({
+            id: 'status-todo',
+            name: 'Todo',
+            position: 1,
+            tasks: [{ id: 'task-1' }],
+          }),
+          createProjectSummaryStatusRecord({
+            id: 'status-done',
+            name: 'Done',
+            position: 3,
+            isClosed: true,
+            tasks: [{ id: 'task-2' }],
+          }),
+        ],
+      }),
+      createProjectSummaryRecord({
         id: 'project-2',
         name: 'Joined Project',
         description: null,
         ownerId: 'owner-1',
-        tasks: [{ status: TaskStatus.IN_PROGRESS }],
-      },
+        statuses: [
+          createProjectSummaryStatusRecord({
+            id: 'status-progress',
+            name: 'In Progress',
+            position: 2,
+            tasks: [{ id: 'task-3' }],
+          }),
+        ],
+      }),
     ]);
 
     const result = await projectsService.listProjects(memberUser);
@@ -176,22 +237,37 @@ describe('ProjectsService', () => {
           name: 'Owned Project',
           description: 'Owned description',
           role: ProjectMemberRole.OWNER,
-          taskCounts: {
-            TODO: 1,
-            IN_PROGRESS: 0,
-            DONE: 1,
-          },
+          statuses: [
+            {
+              id: 'status-todo',
+              name: 'Todo',
+              position: 1,
+              isClosed: false,
+              taskCount: 1,
+            },
+            {
+              id: 'status-done',
+              name: 'Done',
+              position: 3,
+              isClosed: true,
+              taskCount: 1,
+            },
+          ],
         },
         {
           id: 'project-2',
           name: 'Joined Project',
           description: null,
           role: ProjectMemberRole.MEMBER,
-          taskCounts: {
-            TODO: 0,
-            IN_PROGRESS: 1,
-            DONE: 0,
-          },
+          statuses: [
+            {
+              id: 'status-progress',
+              name: 'In Progress',
+              position: 2,
+              isClosed: false,
+              taskCount: 1,
+            },
+          ],
         },
       ],
     });
@@ -199,13 +275,11 @@ describe('ProjectsService', () => {
 
   it('lists all projects for an admin user and preserves documented role output', async () => {
     mockPrismaService.project.findMany.mockResolvedValue([
-      {
+      createProjectSummaryRecord({
         id: 'project-1',
         name: 'Admin Visible Project',
-        description: null,
         ownerId: 'owner-1',
-        tasks: [],
-      },
+      }),
     ]);
 
     const result = await projectsService.listProjects(adminUser);
@@ -224,17 +298,35 @@ describe('ProjectsService', () => {
           name: 'Admin Visible Project',
           description: null,
           role: ProjectMemberRole.MEMBER,
-          taskCounts: {
-            TODO: 0,
-            IN_PROGRESS: 0,
-            DONE: 0,
-          },
+          statuses: [
+            {
+              id: 'status-todo',
+              name: 'Todo',
+              position: 1,
+              isClosed: false,
+              taskCount: 0,
+            },
+            {
+              id: 'status-progress',
+              name: 'In Progress',
+              position: 2,
+              isClosed: false,
+              taskCount: 0,
+            },
+            {
+              id: 'status-done',
+              name: 'Done',
+              position: 3,
+              isClosed: true,
+              taskCount: 0,
+            },
+          ],
         },
       ],
     });
   });
 
-  it('returns grouped project detail with sorted members and board-ready task groups', async () => {
+  it('returns grouped project detail with sorted members and board-ready statuses', async () => {
     mockPrismaService.project.findUnique.mockResolvedValue({
       id: 'project-1',
       name: 'Launch Website',
@@ -255,43 +347,72 @@ describe('ProjectsService', () => {
           },
         },
       ],
-      tasks: [
-        {
-          id: 'task-3',
-          projectId: 'project-1',
-          title: 'Finalize QA',
-          description: null,
-          status: TaskStatus.TODO,
-          position: null,
-          assigneeId: null,
-          dueDate: null,
-          createdAt: new Date('2026-04-03T09:00:00.000Z'),
-          updatedAt: new Date('2026-04-03T09:00:00.000Z'),
-        },
-        {
-          id: 'task-2',
-          projectId: 'project-1',
-          title: 'Ship assets',
-          description: 'Coordinate release files',
-          status: TaskStatus.IN_PROGRESS,
-          position: 2,
-          assigneeId: 'member-1',
-          dueDate: new Date('2026-04-10T00:00:00.000Z'),
-          createdAt: new Date('2026-04-02T09:00:00.000Z'),
-          updatedAt: new Date('2026-04-02T10:00:00.000Z'),
-        },
-        {
-          id: 'task-1',
-          projectId: 'project-1',
-          title: 'Draft launch checklist',
-          description: 'Capture release requirements',
-          status: TaskStatus.TODO,
+      statuses: [
+        createProjectDetailStatusRecord({
+          id: 'status-todo',
+          name: 'Todo',
           position: 1,
-          assigneeId: null,
-          dueDate: new Date('2026-04-08T00:00:00.000Z'),
-          createdAt: new Date('2026-04-01T09:00:00.000Z'),
-          updatedAt: new Date('2026-04-01T10:00:00.000Z'),
-        },
+          tasks: [
+            createProjectTaskRecord({
+              id: 'task-3',
+              title: 'Finalize QA',
+              statusId: 'status-todo',
+              status: createStatusRecord({
+                id: 'status-todo',
+                name: 'Todo',
+                position: 1,
+              }),
+              position: null,
+              createdAt: new Date('2026-04-03T09:00:00.000Z'),
+              updatedAt: new Date('2026-04-03T09:00:00.000Z'),
+            }),
+            createProjectTaskRecord({
+              id: 'task-1',
+              title: 'Draft launch checklist',
+              description: 'Capture release requirements',
+              statusId: 'status-todo',
+              status: createStatusRecord({
+                id: 'status-todo',
+                name: 'Todo',
+                position: 1,
+              }),
+              position: 1,
+              dueDate: new Date('2026-04-08T00:00:00.000Z'),
+              createdAt: new Date('2026-04-01T09:00:00.000Z'),
+              updatedAt: new Date('2026-04-01T10:00:00.000Z'),
+            }),
+          ],
+        }),
+        createProjectDetailStatusRecord({
+          id: 'status-progress',
+          name: 'In Progress',
+          position: 2,
+          tasks: [
+            createProjectTaskRecord({
+              id: 'task-2',
+              title: 'Ship assets',
+              description: 'Coordinate release files',
+              statusId: 'status-progress',
+              status: createStatusRecord({
+                id: 'status-progress',
+                name: 'In Progress',
+                position: 2,
+              }),
+              position: 2,
+              assigneeId: 'member-1',
+              dueDate: new Date('2026-04-10T00:00:00.000Z'),
+              createdAt: new Date('2026-04-02T09:00:00.000Z'),
+              updatedAt: new Date('2026-04-02T10:00:00.000Z'),
+            }),
+          ],
+        }),
+        createProjectDetailStatusRecord({
+          id: 'status-done',
+          name: 'Done',
+          position: 3,
+          isClosed: true,
+          tasks: [],
+        }),
       ],
     });
 
@@ -313,60 +434,176 @@ describe('ProjectsService', () => {
           role: ProjectMemberRole.MEMBER,
         },
       ],
-      taskGroups: {
-        TODO: [
-          {
-            id: 'task-1',
-            projectId: 'project-1',
-            title: 'Draft launch checklist',
-            description: 'Capture release requirements',
-            status: TaskStatus.TODO,
-            position: 1,
-            assigneeId: null,
-            dueDate: '2026-04-08',
-            createdAt: '2026-04-01T09:00:00.000Z',
-            updatedAt: '2026-04-01T10:00:00.000Z',
-          },
-          {
-            id: 'task-3',
-            projectId: 'project-1',
-            title: 'Finalize QA',
-            description: null,
-            status: TaskStatus.TODO,
-            position: null,
-            assigneeId: null,
-            dueDate: null,
-            createdAt: '2026-04-03T09:00:00.000Z',
-            updatedAt: '2026-04-03T09:00:00.000Z',
-          },
-        ],
-        IN_PROGRESS: [
-          {
-            id: 'task-2',
-            projectId: 'project-1',
-            title: 'Ship assets',
-            description: 'Coordinate release files',
-            status: TaskStatus.IN_PROGRESS,
-            position: 2,
-            assigneeId: 'member-1',
-            dueDate: '2026-04-10',
-            createdAt: '2026-04-02T09:00:00.000Z',
-            updatedAt: '2026-04-02T10:00:00.000Z',
-          },
-        ],
-        DONE: [],
-      },
+      statuses: [
+        {
+          id: 'status-todo',
+          name: 'Todo',
+          position: 1,
+          isClosed: false,
+          tasks: [
+            {
+              id: 'task-1',
+              projectId: 'project-1',
+              title: 'Draft launch checklist',
+              description: 'Capture release requirements',
+              statusId: 'status-todo',
+              status: {
+                id: 'status-todo',
+                name: 'Todo',
+                position: 1,
+                isClosed: false,
+              },
+              position: 1,
+              assigneeId: null,
+              dueDate: '2026-04-08',
+              createdAt: '2026-04-01T09:00:00.000Z',
+              updatedAt: '2026-04-01T10:00:00.000Z',
+            },
+            {
+              id: 'task-3',
+              projectId: 'project-1',
+              title: 'Finalize QA',
+              description: null,
+              statusId: 'status-todo',
+              status: {
+                id: 'status-todo',
+                name: 'Todo',
+                position: 1,
+                isClosed: false,
+              },
+              position: null,
+              assigneeId: null,
+              dueDate: null,
+              createdAt: '2026-04-03T09:00:00.000Z',
+              updatedAt: '2026-04-03T09:00:00.000Z',
+            },
+          ],
+        },
+        {
+          id: 'status-progress',
+          name: 'In Progress',
+          position: 2,
+          isClosed: false,
+          tasks: [
+            {
+              id: 'task-2',
+              projectId: 'project-1',
+              title: 'Ship assets',
+              description: 'Coordinate release files',
+              statusId: 'status-progress',
+              status: {
+                id: 'status-progress',
+                name: 'In Progress',
+                position: 2,
+                isClosed: false,
+              },
+              position: 2,
+              assigneeId: 'member-1',
+              dueDate: '2026-04-10',
+              createdAt: '2026-04-02T09:00:00.000Z',
+              updatedAt: '2026-04-02T10:00:00.000Z',
+            },
+          ],
+        },
+        {
+          id: 'status-done',
+          name: 'Done',
+          position: 3,
+          isClosed: true,
+          tasks: [],
+        },
+      ],
     });
   });
 
-  it('updates project fields and clears descriptions when requested', async () => {
-    mockPrismaService.project.update.mockResolvedValue({
+  it('creates a new dynamic project status after the current last lane', async () => {
+    mockPrismaService.project.findUnique.mockResolvedValue({
       id: 'project-1',
-      name: 'Launch Website',
-      description: null,
-      ownerId: 'owner-1',
-      tasks: [{ status: TaskStatus.DONE }],
     });
+    transactionClient.projectStatus.findFirst.mockResolvedValue({
+      position: 3,
+    });
+    transactionClient.projectStatus.create.mockResolvedValue({
+      id: 'status-review',
+      name: 'Review',
+      position: 4,
+      isClosed: false,
+    });
+
+    const result = await projectsService.createProjectStatus('project-1', {
+      name: 'Review',
+    });
+
+    expect(mockPrismaService.project.findUnique).toHaveBeenCalledWith({
+      where: {
+        id: 'project-1',
+      },
+      select: {
+        id: true,
+      },
+    });
+    expect(transactionClient.projectStatus.findFirst).toHaveBeenCalledWith({
+      where: {
+        projectId: 'project-1',
+      },
+      orderBy: {
+        position: 'desc',
+      },
+      select: {
+        position: true,
+      },
+    });
+    expect(transactionClient.projectStatus.create).toHaveBeenCalledWith({
+      data: {
+        projectId: 'project-1',
+        name: 'Review',
+        position: 4,
+        isClosed: false,
+      },
+      select: {
+        id: true,
+        name: true,
+        position: true,
+        isClosed: true,
+      },
+    });
+    expect(result).toEqual({
+      id: 'status-review',
+      name: 'Review',
+      position: 4,
+      isClosed: false,
+      taskCount: 0,
+    });
+  });
+
+  it('maps missing projects to not found errors during status creation', async () => {
+    mockPrismaService.project.findUnique.mockResolvedValue(null);
+
+    await expect(
+      projectsService.createProjectStatus('missing-project', {
+        name: 'Review',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('updates project fields and clears descriptions when requested', async () => {
+    mockPrismaService.project.update.mockResolvedValue(
+      createProjectSummaryRecord({
+        id: 'project-1',
+        name: 'Launch Website',
+        description: null,
+        ownerId: 'owner-1',
+        statuses: [
+          createProjectSummaryStatusRecord({
+            id: 'status-done',
+            name: 'Done',
+            position: 3,
+            isClosed: true,
+            tasks: [{ id: 'task-1' }],
+          }),
+        ],
+      }),
+    );
 
     const result = await projectsService.updateProject(ownerUser, 'project-1', {
       description: null,
@@ -386,11 +623,15 @@ describe('ProjectsService', () => {
       name: 'Launch Website',
       description: null,
       role: ProjectMemberRole.OWNER,
-      taskCounts: {
-        TODO: 0,
-        IN_PROGRESS: 0,
-        DONE: 1,
-      },
+      statuses: [
+        {
+          id: 'status-done',
+          name: 'Done',
+          position: 3,
+          isClosed: true,
+          taskCount: 1,
+        },
+      ],
     });
   });
 
@@ -404,3 +645,124 @@ describe('ProjectsService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+function createStatusRecord(
+  overrides: Partial<{
+    id: string;
+    name: string;
+    position: number;
+    isClosed: boolean;
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? 'status-todo',
+    name: overrides.name ?? 'Todo',
+    position: overrides.position ?? 1,
+    isClosed: overrides.isClosed ?? false,
+  };
+}
+
+function createProjectSummaryStatusRecord(
+  overrides: Partial<{
+    id: string;
+    name: string;
+    position: number;
+    isClosed: boolean;
+    tasks: Array<{ id: string }>;
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? 'status-todo',
+    name: overrides.name ?? 'Todo',
+    position: overrides.position ?? 1,
+    isClosed: overrides.isClosed ?? false,
+    tasks: overrides.tasks ?? [],
+  };
+}
+
+function createProjectSummaryRecord(
+  overrides: Partial<{
+    id: string;
+    name: string;
+    description: string | null;
+    ownerId: string;
+    statuses: Array<ReturnType<typeof createProjectSummaryStatusRecord>>;
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? 'project-1',
+    name: overrides.name ?? 'Launch Website',
+    description: overrides.description ?? null,
+    ownerId: overrides.ownerId ?? 'owner-1',
+    statuses: overrides.statuses ?? [
+      createProjectSummaryStatusRecord({
+        id: 'status-todo',
+        name: 'Todo',
+        position: 1,
+      }),
+      createProjectSummaryStatusRecord({
+        id: 'status-progress',
+        name: 'In Progress',
+        position: 2,
+      }),
+      createProjectSummaryStatusRecord({
+        id: 'status-done',
+        name: 'Done',
+        position: 3,
+        isClosed: true,
+      }),
+    ],
+  };
+}
+
+function createProjectTaskRecord(
+  overrides: Partial<{
+    id: string;
+    projectId: string;
+    title: string;
+    description: string | null;
+    statusId: string;
+    status: ReturnType<typeof createStatusRecord>;
+    position: number | null;
+    assigneeId: string | null;
+    dueDate: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? 'task-1',
+    projectId: overrides.projectId ?? 'project-1',
+    title: overrides.title ?? 'Task',
+    description: overrides.description ?? null,
+    statusId: overrides.statusId ?? 'status-todo',
+    status:
+      overrides.status ??
+      createStatusRecord({
+        id: overrides.statusId ?? 'status-todo',
+      }),
+    position: overrides.position ?? null,
+    assigneeId: overrides.assigneeId ?? null,
+    dueDate: overrides.dueDate ?? null,
+    createdAt: overrides.createdAt ?? new Date('2026-04-01T09:00:00.000Z'),
+    updatedAt: overrides.updatedAt ?? new Date('2026-04-01T09:00:00.000Z'),
+  };
+}
+
+function createProjectDetailStatusRecord(
+  overrides: Partial<{
+    id: string;
+    name: string;
+    position: number;
+    isClosed: boolean;
+    tasks: Array<ReturnType<typeof createProjectTaskRecord>>;
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? 'status-todo',
+    name: overrides.name ?? 'Todo',
+    position: overrides.position ?? 1,
+    isClosed: overrides.isClosed ?? false,
+    tasks: overrides.tasks ?? [],
+  };
+}

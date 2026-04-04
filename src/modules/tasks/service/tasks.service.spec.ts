@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { Prisma, TaskStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { TaskLogsService } from '../../task-logs/service/task-logs.service';
 import { TasksService } from './tasks.service';
@@ -19,7 +19,6 @@ describe('TasksService', () => {
     $transaction: jest.fn(),
     task: {
       create: jest.fn(),
-      findMany: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -31,6 +30,10 @@ describe('TasksService', () => {
     projectMember: {
       findUnique: jest.fn(),
     },
+    projectStatus: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+    },
     user: {
       findUnique: jest.fn(),
     },
@@ -38,7 +41,6 @@ describe('TasksService', () => {
     $transaction: jest.Mock;
     task: {
       create: jest.Mock;
-      findMany: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
       delete: jest.Mock;
@@ -49,6 +51,10 @@ describe('TasksService', () => {
     };
     projectMember: {
       findUnique: jest.Mock;
+    };
+    projectStatus: {
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
     };
     user: {
       findUnique: jest.Mock;
@@ -62,13 +68,14 @@ describe('TasksService', () => {
     jest.clearAllMocks();
     mockPrismaService.$transaction.mockReset();
     mockPrismaService.task.create.mockReset();
-    mockPrismaService.task.findMany.mockReset();
     mockPrismaService.task.findUnique.mockReset();
     mockPrismaService.task.update.mockReset();
     mockPrismaService.task.delete.mockReset();
     mockPrismaService.taskLog.create.mockReset();
     mockPrismaService.taskLog.findMany.mockReset();
     mockPrismaService.projectMember.findUnique.mockReset();
+    mockPrismaService.projectStatus.findMany.mockReset();
+    mockPrismaService.projectStatus.findFirst.mockReset();
     mockPrismaService.user.findUnique.mockReset();
     mockPrismaService.$transaction.mockImplementation(
       async (
@@ -83,122 +90,196 @@ describe('TasksService', () => {
   });
 
   it('lists project tasks grouped by status with board-stable ordering', async () => {
-    mockPrismaService.task.findMany.mockResolvedValue([
-      {
-        id: 'task-done',
-        projectId: 'project-1',
-        title: 'Celebrate release',
-        description: null,
-        status: TaskStatus.DONE,
-        position: null,
-        assigneeId: null,
-        dueDate: null,
-        createdAt: new Date('2026-04-04T09:00:00.000Z'),
-        updatedAt: new Date('2026-04-04T09:00:00.000Z'),
-      },
-      {
-        id: 'task-todo-2',
-        projectId: 'project-1',
-        title: 'Write smoke notes',
-        description: null,
-        status: TaskStatus.TODO,
-        position: 2,
-        assigneeId: null,
-        dueDate: null,
-        createdAt: new Date('2026-04-03T09:00:00.000Z'),
-        updatedAt: new Date('2026-04-03T09:00:00.000Z'),
-      },
-      {
-        id: 'task-progress',
-        projectId: 'project-1',
-        title: 'Review checklist',
-        description: 'Keep the rollout on track',
-        status: TaskStatus.IN_PROGRESS,
-        position: null,
-        assigneeId: 'member-2',
-        dueDate: new Date('2026-04-12T00:00:00.000Z'),
-        createdAt: new Date('2026-04-02T09:00:00.000Z'),
-        updatedAt: new Date('2026-04-02T10:00:00.000Z'),
-      },
-      {
-        id: 'task-todo-1',
-        projectId: 'project-1',
-        title: 'Draft API envelope',
-        description: null,
-        status: TaskStatus.TODO,
+    mockPrismaService.projectStatus.findMany.mockResolvedValue([
+      createProjectTaskStatusRecord({
+        id: 'status-todo',
+        name: 'Todo',
         position: 1,
-        assigneeId: null,
-        dueDate: null,
-        createdAt: new Date('2026-04-01T09:00:00.000Z'),
-        updatedAt: new Date('2026-04-01T09:00:00.000Z'),
-      },
+        tasks: [
+          createTaskRecord({
+            id: 'task-todo-1',
+            title: 'Draft API envelope',
+            statusId: 'status-todo',
+            status: createStatusRecord({
+              id: 'status-todo',
+              name: 'Todo',
+              position: 1,
+            }),
+            position: 1,
+            createdAt: new Date('2026-04-01T09:00:00.000Z'),
+          }),
+          createTaskRecord({
+            id: 'task-todo-2',
+            title: 'Write smoke notes',
+            statusId: 'status-todo',
+            status: createStatusRecord({
+              id: 'status-todo',
+              name: 'Todo',
+              position: 1,
+            }),
+            position: 2,
+            createdAt: new Date('2026-04-03T09:00:00.000Z'),
+            updatedAt: new Date('2026-04-03T09:00:00.000Z'),
+          }),
+        ],
+      }),
+      createProjectTaskStatusRecord({
+        id: 'status-progress',
+        name: 'In Progress',
+        position: 2,
+        tasks: [
+          createTaskRecord({
+            id: 'task-progress',
+            title: 'Review checklist',
+            description: 'Keep the rollout on track',
+            statusId: 'status-progress',
+            status: createStatusRecord({
+              id: 'status-progress',
+              name: 'In Progress',
+              position: 2,
+            }),
+            position: null,
+            assigneeId: 'member-2',
+            dueDate: new Date('2026-04-12T00:00:00.000Z'),
+            createdAt: new Date('2026-04-02T09:00:00.000Z'),
+            updatedAt: new Date('2026-04-02T10:00:00.000Z'),
+          }),
+        ],
+      }),
+      createProjectTaskStatusRecord({
+        id: 'status-done',
+        name: 'Done',
+        position: 3,
+        isClosed: true,
+        tasks: [
+          createTaskRecord({
+            id: 'task-done',
+            title: 'Celebrate release',
+            statusId: 'status-done',
+            status: createStatusRecord({
+              id: 'status-done',
+              name: 'Done',
+              position: 3,
+              isClosed: true,
+            }),
+            position: null,
+            createdAt: new Date('2026-04-04T09:00:00.000Z'),
+            updatedAt: new Date('2026-04-04T09:00:00.000Z'),
+          }),
+        ],
+      }),
     ]);
 
     const result = await tasksService.listProjectTasks('project-1');
 
-    expect(mockPrismaService.task.findMany).toHaveBeenCalledWith({
+    expect(mockPrismaService.projectStatus.findMany).toHaveBeenCalledWith({
       where: {
         projectId: 'project-1',
+      },
+      orderBy: {
+        position: 'asc',
       },
       select: expect.any(Object),
     });
     expect(result).toEqual({
-      taskGroups: {
-        TODO: [
-          {
-            id: 'task-todo-1',
-            projectId: 'project-1',
-            title: 'Draft API envelope',
-            description: null,
-            status: TaskStatus.TODO,
-            position: 1,
-            assigneeId: null,
-            dueDate: null,
-            createdAt: '2026-04-01T09:00:00.000Z',
-            updatedAt: '2026-04-01T09:00:00.000Z',
-          },
-          {
-            id: 'task-todo-2',
-            projectId: 'project-1',
-            title: 'Write smoke notes',
-            description: null,
-            status: TaskStatus.TODO,
-            position: 2,
-            assigneeId: null,
-            dueDate: null,
-            createdAt: '2026-04-03T09:00:00.000Z',
-            updatedAt: '2026-04-03T09:00:00.000Z',
-          },
-        ],
-        IN_PROGRESS: [
-          {
-            id: 'task-progress',
-            projectId: 'project-1',
-            title: 'Review checklist',
-            description: 'Keep the rollout on track',
-            status: TaskStatus.IN_PROGRESS,
-            position: null,
-            assigneeId: 'member-2',
-            dueDate: '2026-04-12',
-            createdAt: '2026-04-02T09:00:00.000Z',
-            updatedAt: '2026-04-02T10:00:00.000Z',
-          },
-        ],
-        DONE: [
-          {
-            id: 'task-done',
-            projectId: 'project-1',
-            title: 'Celebrate release',
-            description: null,
-            status: TaskStatus.DONE,
-            position: null,
-            assigneeId: null,
-            dueDate: null,
-            createdAt: '2026-04-04T09:00:00.000Z',
-            updatedAt: '2026-04-04T09:00:00.000Z',
-          },
-        ],
-      },
+      statuses: [
+        {
+          id: 'status-todo',
+          name: 'Todo',
+          position: 1,
+          isClosed: false,
+          tasks: [
+            {
+              id: 'task-todo-1',
+              projectId: 'project-1',
+              title: 'Draft API envelope',
+              description: null,
+              statusId: 'status-todo',
+              status: {
+                id: 'status-todo',
+                name: 'Todo',
+                position: 1,
+                isClosed: false,
+              },
+              position: 1,
+              assigneeId: null,
+              dueDate: null,
+              createdAt: '2026-04-01T09:00:00.000Z',
+              updatedAt: '2026-04-01T09:00:00.000Z',
+            },
+            {
+              id: 'task-todo-2',
+              projectId: 'project-1',
+              title: 'Write smoke notes',
+              description: null,
+              statusId: 'status-todo',
+              status: {
+                id: 'status-todo',
+                name: 'Todo',
+                position: 1,
+                isClosed: false,
+              },
+              position: 2,
+              assigneeId: null,
+              dueDate: null,
+              createdAt: '2026-04-03T09:00:00.000Z',
+              updatedAt: '2026-04-03T09:00:00.000Z',
+            },
+          ],
+        },
+        {
+          id: 'status-progress',
+          name: 'In Progress',
+          position: 2,
+          isClosed: false,
+          tasks: [
+            {
+              id: 'task-progress',
+              projectId: 'project-1',
+              title: 'Review checklist',
+              description: 'Keep the rollout on track',
+              statusId: 'status-progress',
+              status: {
+                id: 'status-progress',
+                name: 'In Progress',
+                position: 2,
+                isClosed: false,
+              },
+              position: null,
+              assigneeId: 'member-2',
+              dueDate: '2026-04-12',
+              createdAt: '2026-04-02T09:00:00.000Z',
+              updatedAt: '2026-04-02T10:00:00.000Z',
+            },
+          ],
+        },
+        {
+          id: 'status-done',
+          name: 'Done',
+          position: 3,
+          isClosed: true,
+          tasks: [
+            {
+              id: 'task-done',
+              projectId: 'project-1',
+              title: 'Celebrate release',
+              description: null,
+              statusId: 'status-done',
+              status: {
+                id: 'status-done',
+                name: 'Done',
+                position: 3,
+                isClosed: true,
+              },
+              position: null,
+              assigneeId: null,
+              dueDate: null,
+              createdAt: '2026-04-04T09:00:00.000Z',
+              updatedAt: '2026-04-04T09:00:00.000Z',
+            },
+          ],
+        },
+      ],
     });
   });
 
@@ -206,23 +287,34 @@ describe('TasksService', () => {
     mockPrismaService.projectMember.findUnique.mockResolvedValue({
       id: 'membership-1',
     });
-    mockPrismaService.task.create.mockResolvedValue({
-      id: 'task-1',
-      projectId: 'project-1',
-      title: 'Ship launch checklist',
-      description: 'Final review before launch',
-      status: TaskStatus.IN_PROGRESS,
-      position: null,
-      assigneeId: 'member-2',
-      dueDate: new Date('2026-04-15T00:00:00.000Z'),
-      createdAt: new Date('2026-04-01T09:00:00.000Z'),
-      updatedAt: new Date('2026-04-01T09:00:00.000Z'),
-    });
+    mockPrismaService.projectStatus.findFirst.mockResolvedValue(
+      createStatusRecord({
+        id: 'status-progress',
+        name: 'In Progress',
+        position: 2,
+      }),
+    );
+    mockPrismaService.task.create.mockResolvedValue(
+      createTaskRecord({
+        id: 'task-1',
+        title: 'Ship launch checklist',
+        description: 'Final review before launch',
+        statusId: 'status-progress',
+        status: createStatusRecord({
+          id: 'status-progress',
+          name: 'In Progress',
+          position: 2,
+        }),
+        position: null,
+        assigneeId: 'member-2',
+        dueDate: new Date('2026-04-15T00:00:00.000Z'),
+      }),
+    );
 
     const result = await tasksService.createTask(currentUser, 'project-1', {
       title: 'Ship launch checklist',
       description: 'Final review before launch',
-      status: TaskStatus.IN_PROGRESS,
+      statusId: 'status-progress',
       assigneeId: 'member-2',
       dueDate: '2026-04-15',
     });
@@ -238,12 +330,24 @@ describe('TasksService', () => {
         id: true,
       },
     });
+    expect(mockPrismaService.projectStatus.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'status-progress',
+        projectId: 'project-1',
+      },
+      select: {
+        id: true,
+        name: true,
+        position: true,
+        isClosed: true,
+      },
+    });
     expect(mockPrismaService.task.create).toHaveBeenCalledWith({
       data: {
         projectId: 'project-1',
         title: 'Ship launch checklist',
         description: 'Final review before launch',
-        status: TaskStatus.IN_PROGRESS,
+        statusId: 'status-progress',
         assigneeId: 'member-2',
         dueDate: new Date('2026-04-15'),
         createdById: 'member-1',
@@ -263,7 +367,13 @@ describe('TasksService', () => {
       projectId: 'project-1',
       title: 'Ship launch checklist',
       description: 'Final review before launch',
-      status: TaskStatus.IN_PROGRESS,
+      statusId: 'status-progress',
+      status: {
+        id: 'status-progress',
+        name: 'In Progress',
+        position: 2,
+        isClosed: false,
+      },
       position: null,
       assigneeId: 'member-2',
       dueDate: '2026-04-15',
@@ -286,25 +396,33 @@ describe('TasksService', () => {
   });
 
   it('returns a normalized task shape when loading a task by id', async () => {
-    mockPrismaService.task.findUnique.mockResolvedValue({
-      id: 'task-1',
-      projectId: 'project-1',
-      title: 'Ship launch checklist',
-      description: null,
-      status: TaskStatus.TODO,
-      position: 3,
-      assigneeId: null,
-      dueDate: null,
-      createdAt: new Date('2026-04-01T09:00:00.000Z'),
-      updatedAt: new Date('2026-04-02T10:00:00.000Z'),
-    });
+    mockPrismaService.task.findUnique.mockResolvedValue(
+      createTaskRecord({
+        id: 'task-1',
+        title: 'Ship launch checklist',
+        statusId: 'status-todo',
+        status: createStatusRecord({
+          id: 'status-todo',
+          name: 'Todo',
+          position: 1,
+        }),
+        position: 3,
+        updatedAt: new Date('2026-04-02T10:00:00.000Z'),
+      }),
+    );
 
     await expect(tasksService.getTask('task-1')).resolves.toEqual({
       id: 'task-1',
       projectId: 'project-1',
       title: 'Ship launch checklist',
       description: null,
-      status: TaskStatus.TODO,
+      statusId: 'status-todo',
+      status: {
+        id: 'status-todo',
+        name: 'Todo',
+        position: 1,
+        isClosed: false,
+      },
       position: 3,
       assigneeId: null,
       dueDate: null,
@@ -316,23 +434,38 @@ describe('TasksService', () => {
   it('patches task status, clears omitted position, and stamps updatedById', async () => {
     mockPrismaService.task.findUnique.mockResolvedValue({
       id: 'task-1',
-      status: TaskStatus.TODO,
-    });
-    mockPrismaService.task.update.mockResolvedValue({
-      id: 'task-1',
       projectId: 'project-1',
-      title: 'Ship launch checklist',
-      description: null,
-      status: TaskStatus.DONE,
-      position: null,
-      assigneeId: null,
-      dueDate: null,
-      createdAt: new Date('2026-04-01T09:00:00.000Z'),
-      updatedAt: new Date('2026-04-06T09:00:00.000Z'),
+      statusId: 'status-todo',
+      status: {
+        name: 'Todo',
+      },
     });
+    mockPrismaService.projectStatus.findFirst.mockResolvedValue(
+      createStatusRecord({
+        id: 'status-done',
+        name: 'Done',
+        position: 3,
+        isClosed: true,
+      }),
+    );
+    mockPrismaService.task.update.mockResolvedValue(
+      createTaskRecord({
+        id: 'task-1',
+        title: 'Ship launch checklist',
+        statusId: 'status-done',
+        status: createStatusRecord({
+          id: 'status-done',
+          name: 'Done',
+          position: 3,
+          isClosed: true,
+        }),
+        position: null,
+        updatedAt: new Date('2026-04-06T09:00:00.000Z'),
+      }),
+    );
 
     const result = await tasksService.updateTaskStatus(currentUser, 'task-1', {
-      status: TaskStatus.DONE,
+      statusId: 'status-done',
     });
 
     expect(mockPrismaService.task.update).toHaveBeenCalledWith({
@@ -340,7 +473,7 @@ describe('TasksService', () => {
         id: 'task-1',
       },
       data: {
-        status: TaskStatus.DONE,
+        statusId: 'status-done',
         position: null,
         updatedById: 'member-1',
       },
@@ -352,8 +485,8 @@ describe('TasksService', () => {
         actorId: 'member-1',
         eventType: 'STATUS_CHANGED',
         fieldName: 'status',
-        oldValue: TaskStatus.TODO,
-        newValue: TaskStatus.DONE,
+        oldValue: 'Todo',
+        newValue: 'Done',
       }),
     });
     expect(result).toEqual({
@@ -361,7 +494,13 @@ describe('TasksService', () => {
       projectId: 'project-1',
       title: 'Ship launch checklist',
       description: null,
-      status: TaskStatus.DONE,
+      statusId: 'status-done',
+      status: {
+        id: 'status-done',
+        name: 'Done',
+        position: 3,
+        isClosed: true,
+      },
       position: null,
       assigneeId: null,
       dueDate: null,
@@ -373,23 +512,36 @@ describe('TasksService', () => {
   it('persists an explicit positive position when patching task status', async () => {
     mockPrismaService.task.findUnique.mockResolvedValue({
       id: 'task-1',
-      status: TaskStatus.TODO,
-    });
-    mockPrismaService.task.update.mockResolvedValue({
-      id: 'task-1',
       projectId: 'project-1',
-      title: 'Ship launch checklist',
-      description: null,
-      status: TaskStatus.IN_PROGRESS,
-      position: 2,
-      assigneeId: null,
-      dueDate: null,
-      createdAt: new Date('2026-04-01T09:00:00.000Z'),
-      updatedAt: new Date('2026-04-06T10:00:00.000Z'),
+      statusId: 'status-todo',
+      status: {
+        name: 'Todo',
+      },
     });
+    mockPrismaService.projectStatus.findFirst.mockResolvedValue(
+      createStatusRecord({
+        id: 'status-progress',
+        name: 'In Progress',
+        position: 2,
+      }),
+    );
+    mockPrismaService.task.update.mockResolvedValue(
+      createTaskRecord({
+        id: 'task-1',
+        title: 'Ship launch checklist',
+        statusId: 'status-progress',
+        status: createStatusRecord({
+          id: 'status-progress',
+          name: 'In Progress',
+          position: 2,
+        }),
+        position: 2,
+        updatedAt: new Date('2026-04-06T10:00:00.000Z'),
+      }),
+    );
 
     const result = await tasksService.updateTaskStatus(currentUser, 'task-1', {
-      status: TaskStatus.IN_PROGRESS,
+      statusId: 'status-progress',
       position: 2,
     });
 
@@ -398,49 +550,55 @@ describe('TasksService', () => {
         id: 'task-1',
       },
       data: {
-        status: TaskStatus.IN_PROGRESS,
+        statusId: 'status-progress',
         position: 2,
         updatedById: 'member-1',
       },
       select: expect.any(Object),
     });
     expect(result.position).toBe(2);
-    expect(result.status).toBe(TaskStatus.IN_PROGRESS);
+    expect(result.status).toEqual({
+      id: 'status-progress',
+      name: 'In Progress',
+      position: 2,
+      isClosed: false,
+    });
   });
 
   it('does not create a status-change log when the patched status is unchanged', async () => {
     mockPrismaService.task.findUnique.mockResolvedValue({
       id: 'task-1',
-      status: TaskStatus.IN_PROGRESS,
-    });
-    mockPrismaService.task.update.mockResolvedValue({
-      id: 'task-1',
       projectId: 'project-1',
-      title: 'Ship launch checklist',
-      description: null,
-      status: TaskStatus.IN_PROGRESS,
-      position: null,
-      assigneeId: null,
-      dueDate: null,
-      createdAt: new Date('2026-04-01T09:00:00.000Z'),
-      updatedAt: new Date('2026-04-06T10:00:00.000Z'),
+      statusId: 'status-progress',
+      status: {
+        name: 'In Progress',
+      },
     });
+    mockPrismaService.projectStatus.findFirst.mockResolvedValue(
+      createStatusRecord({
+        id: 'status-progress',
+        name: 'In Progress',
+        position: 2,
+      }),
+    );
+    mockPrismaService.task.update.mockResolvedValue(
+      createTaskRecord({
+        id: 'task-1',
+        title: 'Ship launch checklist',
+        statusId: 'status-progress',
+        status: createStatusRecord({
+          id: 'status-progress',
+          name: 'In Progress',
+          position: 2,
+        }),
+        updatedAt: new Date('2026-04-06T10:00:00.000Z'),
+      }),
+    );
 
     await tasksService.updateTaskStatus(currentUser, 'task-1', {
-      status: TaskStatus.IN_PROGRESS,
+      statusId: 'status-progress',
     });
 
-    expect(mockPrismaService.task.update).toHaveBeenCalledWith({
-      where: {
-        id: 'task-1',
-      },
-      data: {
-        status: TaskStatus.IN_PROGRESS,
-        position: null,
-        updatedById: 'member-1',
-      },
-      select: expect.any(Object),
-    });
     expect(mockPrismaService.taskLog.create).not.toHaveBeenCalled();
   });
 
@@ -449,7 +607,7 @@ describe('TasksService', () => {
 
     await expect(
       tasksService.updateTaskStatus(currentUser, 'missing-task', {
-        status: TaskStatus.DONE,
+        statusId: 'status-done',
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -469,18 +627,23 @@ describe('TasksService', () => {
       id: 'member-2',
       name: 'Jordan Lane',
     });
-    mockPrismaService.task.update.mockResolvedValue({
-      id: 'task-1',
-      projectId: 'project-1',
-      title: 'Review release notes',
-      description: 'Review release notes with QA',
-      status: TaskStatus.TODO,
-      position: null,
-      assigneeId: 'member-2',
-      dueDate: new Date('2026-04-20T00:00:00.000Z'),
-      createdAt: new Date('2026-04-01T09:00:00.000Z'),
-      updatedAt: new Date('2026-04-02T11:00:00.000Z'),
-    });
+    mockPrismaService.task.update.mockResolvedValue(
+      createTaskRecord({
+        id: 'task-1',
+        title: 'Review release notes',
+        description: 'Review release notes with QA',
+        statusId: 'status-todo',
+        status: createStatusRecord({
+          id: 'status-todo',
+          name: 'Todo',
+          position: 1,
+        }),
+        assigneeId: 'member-2',
+        dueDate: new Date('2026-04-20T00:00:00.000Z'),
+        position: null,
+        updatedAt: new Date('2026-04-02T11:00:00.000Z'),
+      }),
+    );
 
     const result = await tasksService.updateTask(currentUser, 'task-1', {
       title: 'Review release notes',
@@ -550,7 +713,13 @@ describe('TasksService', () => {
       projectId: 'project-1',
       title: 'Review release notes',
       description: 'Review release notes with QA',
-      status: TaskStatus.TODO,
+      statusId: 'status-todo',
+      status: {
+        id: 'status-todo',
+        name: 'Todo',
+        position: 1,
+        isClosed: false,
+      },
       position: null,
       assigneeId: 'member-2',
       dueDate: '2026-04-20',
@@ -577,3 +746,71 @@ describe('TasksService', () => {
     );
   });
 });
+
+function createStatusRecord(
+  overrides: Partial<{
+    id: string;
+    name: string;
+    position: number;
+    isClosed: boolean;
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? 'status-todo',
+    name: overrides.name ?? 'Todo',
+    position: overrides.position ?? 1,
+    isClosed: overrides.isClosed ?? false,
+  };
+}
+
+function createTaskRecord(
+  overrides: Partial<{
+    id: string;
+    projectId: string;
+    title: string;
+    description: string | null;
+    statusId: string;
+    status: ReturnType<typeof createStatusRecord>;
+    position: number | null;
+    assigneeId: string | null;
+    dueDate: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? 'task-1',
+    projectId: overrides.projectId ?? 'project-1',
+    title: overrides.title ?? 'Ship launch checklist',
+    description: overrides.description ?? null,
+    statusId: overrides.statusId ?? 'status-todo',
+    status:
+      overrides.status ??
+      createStatusRecord({
+        id: overrides.statusId ?? 'status-todo',
+      }),
+    position: overrides.position ?? null,
+    assigneeId: overrides.assigneeId ?? null,
+    dueDate: overrides.dueDate ?? null,
+    createdAt: overrides.createdAt ?? new Date('2026-04-01T09:00:00.000Z'),
+    updatedAt: overrides.updatedAt ?? new Date('2026-04-01T09:00:00.000Z'),
+  };
+}
+
+function createProjectTaskStatusRecord(
+  overrides: Partial<{
+    id: string;
+    name: string;
+    position: number;
+    isClosed: boolean;
+    tasks: Array<ReturnType<typeof createTaskRecord>>;
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? 'status-todo',
+    name: overrides.name ?? 'Todo',
+    position: overrides.position ?? 1,
+    isClosed: overrides.isClosed ?? false,
+    tasks: overrides.tasks ?? [],
+  };
+}

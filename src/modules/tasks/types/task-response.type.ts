@@ -1,11 +1,17 @@
-import { TaskStatus } from '@prisma/client';
+export type TaskStatusResponse = {
+  id: string;
+  name: string;
+  position: number;
+  isClosed: boolean;
+};
 
 export type TaskResponse = {
   id: string;
   projectId: string;
   title: string;
   description: string | null;
-  status: TaskStatus;
+  statusId: string;
+  status: TaskStatusResponse;
   position: number | null;
   assigneeId: string | null;
   dueDate: string | null;
@@ -17,10 +23,19 @@ export type DeleteTaskResponse = {
   message: string;
 };
 
-export type TaskGroupsResponse = Record<TaskStatus, TaskResponse[]>;
+export type ProjectTaskStatusResponse = TaskStatusResponse & {
+  tasks: TaskResponse[];
+};
 
 export type ProjectTasksResponse = {
-  taskGroups: TaskGroupsResponse;
+  statuses: ProjectTaskStatusResponse[];
+};
+
+export type TaskStatusRecord = {
+  id: string;
+  name: string;
+  position: number;
+  isClosed: boolean;
 };
 
 export type TaskRecord = {
@@ -28,7 +43,8 @@ export type TaskRecord = {
   projectId: string;
   title: string;
   description: string | null;
-  status: TaskStatus;
+  statusId: string;
+  status: TaskStatusRecord;
   position: number | null;
   assigneeId: string | null;
   dueDate: Date | null;
@@ -36,4 +52,6 @@ export type TaskRecord = {
   updatedAt: Date;
 };
 
-export type TaskGroupRecords = Record<TaskStatus, TaskRecord[]>;
+export type ProjectTaskStatusRecord = TaskStatusRecord & {
+  tasks: TaskRecord[];
+};

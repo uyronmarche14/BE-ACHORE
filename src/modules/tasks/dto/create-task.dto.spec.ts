@@ -1,5 +1,4 @@
 import { BadRequestException, type ArgumentMetadata } from '@nestjs/common';
-import { TaskStatus } from '@prisma/client';
 import { createGlobalValidationPipe } from '../../../common/pipes/global-validation.pipe';
 import { CreateTaskDto } from './create-task.dto';
 
@@ -17,7 +16,7 @@ describe('CreateTaskDto validation', () => {
         {
           title: '  Ship    launch checklist  ',
           description: '  Final review before launch  ',
-          status: TaskStatus.IN_PROGRESS,
+          statusId: 'status-in-progress',
           assigneeId: '  user-2  ',
           dueDate: '2026-04-15',
         },
@@ -26,18 +25,18 @@ describe('CreateTaskDto validation', () => {
     ).resolves.toEqual({
       title: 'Ship launch checklist',
       description: 'Final review before launch',
-      status: TaskStatus.IN_PROGRESS,
+      statusId: 'status-in-progress',
       assigneeId: 'user-2',
       dueDate: '2026-04-15',
     });
   });
 
-  it('rejects blank titles, invalid status values, and unknown fields', async () => {
+  it('rejects blank titles, blank status ids, and unknown fields', async () => {
     await expect(
       validationPipe.transform(
         {
           title: '   ',
-          status: 'LATER',
+          statusId: '   ',
           extra: 'field',
         },
         metadata,

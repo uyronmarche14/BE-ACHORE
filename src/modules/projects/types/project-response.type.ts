@@ -1,19 +1,20 @@
-import {
-  Prisma,
-  ProjectMemberRole,
-  TaskLogEventType,
-  TaskStatus,
-} from '@prisma/client';
+import { Prisma, ProjectMemberRole, TaskLogEventType } from '@prisma/client';
 import type { TaskLogValue } from '../../task-logs/types/task-log-response.type';
 
-export type ProjectTaskCounts = Record<TaskStatus, number>;
+export type ProjectStatusSummaryResponse = {
+  id: string;
+  name: string;
+  position: number;
+  isClosed: boolean;
+  taskCount: number;
+};
 
 export type ProjectSummaryResponse = {
   id: string;
   name: string;
   description: string | null;
   role: ProjectMemberRole;
-  taskCounts: ProjectTaskCounts;
+  statuses: ProjectStatusSummaryResponse[];
 };
 
 export type ProjectListResponse = {
@@ -26,12 +27,26 @@ export type ProjectMemberResponse = {
   role: ProjectMemberRole;
 };
 
+export type ProjectTaskStatusResponse = {
+  id: string;
+  name: string;
+  position: number;
+  isClosed: boolean;
+  tasks: ProjectTaskCardResponse[];
+};
+
 export type ProjectTaskCardResponse = {
   id: string;
   projectId: string;
   title: string;
   description: string | null;
-  status: TaskStatus;
+  statusId: string;
+  status: {
+    id: string;
+    name: string;
+    position: number;
+    isClosed: boolean;
+  };
   position: number | null;
   assigneeId: string | null;
   dueDate: string | null;
@@ -39,17 +54,12 @@ export type ProjectTaskCardResponse = {
   updatedAt: string;
 };
 
-export type ProjectTaskGroupsResponse = Record<
-  TaskStatus,
-  ProjectTaskCardResponse[]
->;
-
 export type ProjectDetailResponse = {
   id: string;
   name: string;
   description: string | null;
   members: ProjectMemberResponse[];
-  taskGroups: ProjectTaskGroupsResponse;
+  statuses: ProjectTaskStatusResponse[];
 };
 
 export type DeleteProjectResponse = {
@@ -71,7 +81,9 @@ export type ProjectActivityEntryResponse = {
   task: {
     id: string;
     title: string;
-    status: TaskStatus;
+    statusId: string;
+    statusName: string;
+    isClosed: boolean;
   };
 };
 
@@ -82,14 +94,22 @@ export type ProjectActivityResponse = {
   hasMore: boolean;
 };
 
+export type ProjectSummaryStatusRecord = {
+  id: string;
+  name: string;
+  position: number;
+  isClosed: boolean;
+  tasks: Array<{
+    id: string;
+  }>;
+};
+
 export type ProjectSummaryRecord = {
   id: string;
   name: string;
   description: string | null;
   ownerId: string;
-  tasks: Array<{
-    status: TaskStatus;
-  }>;
+  statuses: ProjectSummaryStatusRecord[];
 };
 
 export type ProjectDetailMemberRecord = {
@@ -100,12 +120,26 @@ export type ProjectDetailMemberRecord = {
   };
 };
 
+export type ProjectDetailTaskStatusRecord = {
+  id: string;
+  name: string;
+  position: number;
+  isClosed: boolean;
+  tasks: ProjectDetailTaskRecord[];
+};
+
 export type ProjectDetailTaskRecord = {
   id: string;
   projectId: string;
   title: string;
   description: string | null;
-  status: TaskStatus;
+  statusId: string;
+  status: {
+    id: string;
+    name: string;
+    position: number;
+    isClosed: boolean;
+  };
   position: number | null;
   assigneeId: string | null;
   dueDate: Date | null;
@@ -113,17 +147,12 @@ export type ProjectDetailTaskRecord = {
   updatedAt: Date;
 };
 
-export type ProjectTaskGroupsRecord = Record<
-  TaskStatus,
-  ProjectDetailTaskRecord[]
->;
-
 export type ProjectDetailRecord = {
   id: string;
   name: string;
   description: string | null;
   members: ProjectDetailMemberRecord[];
-  taskGroups: ProjectTaskGroupsRecord;
+  statuses: ProjectDetailTaskStatusRecord[];
 };
 
 export type ProjectActivityRecord = {
@@ -141,6 +170,10 @@ export type ProjectActivityRecord = {
   task: {
     id: string;
     title: string;
-    status: TaskStatus;
+    statusId: string;
+    status: {
+      name: string;
+      isClosed: boolean;
+    };
   };
 };

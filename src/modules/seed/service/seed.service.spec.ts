@@ -5,11 +5,15 @@ import {
   Prisma,
   ProjectMemberRole,
   TaskLogEventType,
-  TaskStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { TaskLogsService } from '../../task-logs/service/task-logs.service';
-import { DEMO_PROJECTS, DEMO_SEED_IDS, DEMO_USERS } from '../seed-data';
+import {
+  DEMO_PROJECTS,
+  DEMO_PROJECT_STATUSES,
+  DEMO_SEED_IDS,
+  DEMO_USERS,
+} from '../seed-data';
 import { SeedService } from './seed.service';
 
 type UserRecord = {
@@ -53,12 +57,22 @@ type TaskRecord = {
   projectId: string;
   title: string;
   description: string | null;
-  status: TaskStatus;
+  statusId: string;
   position: number | null;
   assigneeId: string | null;
   dueDate: Date | null;
   createdById: string;
   updatedById: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type ProjectStatusRecord = {
+  id: string;
+  projectId: string;
+  name: string;
+  position: number;
+  isClosed: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -80,6 +94,7 @@ describe('SeedService', () => {
   let refreshTokens: RefreshTokenRecord[];
   let projects: ProjectRecord[];
   let projectMembers: ProjectMemberRecord[];
+  let projectStatuses: ProjectStatusRecord[];
   let tasks: TaskRecord[];
   let taskLogs: TaskLogRecord[];
   let configValues: Record<string, boolean | string>;
@@ -106,6 +121,10 @@ describe('SeedService', () => {
       deleteMany: jest.fn(),
     },
     projectMember: {
+      createMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    projectStatus: {
       createMany: jest.fn(),
       deleteMany: jest.fn(),
     },
@@ -141,6 +160,10 @@ describe('SeedService', () => {
       createMany: jest.Mock;
       deleteMany: jest.Mock;
     };
+    projectStatus: {
+      createMany: jest.Mock;
+      deleteMany: jest.Mock;
+    };
     task: {
       createMany: jest.Mock;
       deleteMany: jest.Mock;
@@ -160,6 +183,7 @@ describe('SeedService', () => {
     refreshTokens = [];
     projects = [];
     projectMembers = [];
+    projectStatuses = [];
     tasks = [];
     taskLogs = [];
     configValues = {
@@ -269,6 +293,24 @@ describe('SeedService', () => {
         return { count: 0 };
       },
     );
+    mockPrismaService.projectStatus.createMany.mockImplementation(
+      ({ data }: { data: ProjectStatusRecord[] }) => {
+        projectStatuses = [...projectStatuses, ...data];
+
+        return {
+          count: data.length,
+        };
+      },
+    );
+    mockPrismaService.projectStatus.deleteMany.mockImplementation(
+      ({ where }: { where: { id: { in: string[] } } }) => {
+        projectStatuses = projectStatuses.filter(
+          (status) => !where.id.in.includes(status.id),
+        );
+
+        return { count: 0 };
+      },
+    );
     mockPrismaService.task.createMany.mockImplementation(
       ({ data }: { data: TaskRecord[] }) => {
         tasks = [...tasks, ...data];
@@ -350,13 +392,28 @@ describe('SeedService', () => {
         expect.objectContaining({ name: DEMO_PROJECTS.secondary.name }),
       ]),
     );
+    for (const status of Object.values(DEMO_PROJECT_STATUSES)) {
+      expect(projectStatuses).toContainEqual(
+        expect.objectContaining({
+          id: status.id,
+          projectId: status.projectId,
+          name: status.name,
+        }),
+      );
+    }
     expect(
       tasks.filter((task) => task.projectId === DEMO_PROJECTS.primary.id),
     ).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ status: TaskStatus.TODO }),
-        expect.objectContaining({ status: TaskStatus.IN_PROGRESS }),
-        expect.objectContaining({ status: TaskStatus.DONE }),
+        expect.objectContaining({
+          statusId: DEMO_PROJECT_STATUSES.primaryTodo.id,
+        }),
+        expect.objectContaining({
+          statusId: DEMO_PROJECT_STATUSES.primaryInProgress.id,
+        }),
+        expect.objectContaining({
+          statusId: DEMO_PROJECT_STATUSES.primaryDone.id,
+        }),
       ]),
     );
     expect(taskLogs.map((taskLog) => taskLog.eventType)).toEqual([
@@ -405,7 +462,7 @@ describe('SeedService', () => {
         projectId: 'other-project',
         title: 'Keep unrelated work',
         description: null,
-        status: TaskStatus.TODO,
+        statusId: 'other-status',
         position: 1,
         assigneeId: null,
         dueDate: null,

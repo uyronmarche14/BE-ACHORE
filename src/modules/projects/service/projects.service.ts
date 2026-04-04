@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, ProjectMemberRole } from '@prisma/client';
-import { createNotFoundException } from '../../../common/utils/api-exception.util';
-import { groupTaskRecordsByStatus } from '../../../common/utils/task-groups.util';
+import {
+  createConflictException,
+  createNotFoundException,
+} from '../../../common/utils/api-exception.util';
 import { PrismaService } from '../../../database/prisma.service';
 import type { AuthUserResponse } from '../../auth/types/auth-response.type';
+import { DEFAULT_PROJECT_STATUS_DEFINITIONS } from '../constants/project-status.constants';
 import type { CreateProjectDto } from '../dto/create-project.dto';
+import type { CreateProjectStatusDto } from '../dto/create-project-status.dto';
 import type { GetProjectActivityQueryDto } from '../dto/get-project-activity-query.dto';
 import type { UpdateProjectDto } from '../dto/update-project.dto';
 import {
@@ -20,6 +24,7 @@ import type {
   ProjectDetailMemberRecord,
   ProjectDetailResponse,
   ProjectListResponse,
+  ProjectStatusSummaryResponse,
   ProjectSummaryResponse,
 } from '../types/project-response.type';
 
@@ -39,7 +44,9 @@ export class ProjectsService {
             description: createProjectDto.description ?? null,
             ownerId: currentUser.id,
           },
-          select: projectSummarySelect,
+          select: {
+            id: true,
+          },
         });
 
         await transaction.projectMember.create({
@@ -49,8 +56,21 @@ export class ProjectsService {
             role: ProjectMemberRole.OWNER,
           },
         });
+        await transaction.projectStatus.createMany({
+          data: DEFAULT_PROJECT_STATUS_DEFINITIONS.map((status) => ({
+            projectId: project.id,
+            name: status.name,
+            position: status.position,
+            isClosed: status.isClosed,
+          })),
+        });
 
-        return project;
+        return transaction.project.findUniqueOrThrow({
+          where: {
+            id: project.id,
+          },
+          select: projectSummarySelect,
+        });
       },
     );
 
@@ -104,8 +124,61 @@ export class ProjectsService {
       name: project.name,
       description: project.description,
       members: [...project.members].sort(compareProjectMembers),
-      taskGroups: groupTaskRecordsByStatus(project.tasks),
+      statuses: project.statuses,
     });
+  }
+
+  async createProjectStatus(
+    projectId: string,
+    createProjectStatusDto: CreateProjectStatusDto,
+  ): Promise<ProjectStatusSummaryResponse> {
+    await this.assertProjectExists(projectId);
+
+    try {
+      const createdStatus = await this.prismaService.$transaction(
+        async (transaction) => {
+          const lastStatus = await transaction.projectStatus.findFirst({
+            where: {
+              projectId,
+            },
+            orderBy: {
+              position: 'desc',
+            },
+            select: {
+              position: true,
+            },
+          });
+
+          return transaction.projectStatus.create({
+            data: {
+              projectId,
+              name: createProjectStatusDto.name,
+              position: (lastStatus?.position ?? 0) + 1,
+              isClosed: createProjectStatusDto.isClosed ?? false,
+            },
+            select: {
+              id: true,
+              name: true,
+              position: true,
+              isClosed: true,
+            },
+          });
+        },
+      );
+
+      return {
+        ...createdStatus,
+        taskCount: 0,
+      };
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        throw createConflictException({
+          message: 'A status with this name already exists for the project',
+        });
+      }
+
+      throw error;
+    }
   }
 
   async updateProject(
@@ -243,12 +316,44 @@ const projectSummarySelect = {
   name: true,
   description: true,
   ownerId: true,
-  tasks: {
+  statuses: {
+    orderBy: {
+      position: 'asc',
+    },
     select: {
-      status: true,
+      id: true,
+      name: true,
+      position: true,
+      isClosed: true,
+      tasks: {
+        select: {
+          id: true,
+        },
+      },
     },
   },
-} satisfies Record<string, unknown>;
+} satisfies Prisma.ProjectSelect;
+
+const projectDetailTaskSelect = {
+  id: true,
+  projectId: true,
+  title: true,
+  description: true,
+  statusId: true,
+  status: {
+    select: {
+      id: true,
+      name: true,
+      position: true,
+      isClosed: true,
+    },
+  },
+  position: true,
+  assigneeId: true,
+  dueDate: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.TaskSelect;
 
 const projectDetailSelect = {
   id: true,
@@ -265,21 +370,21 @@ const projectDetailSelect = {
       },
     },
   },
-  tasks: {
+  statuses: {
+    orderBy: {
+      position: 'asc',
+    },
     select: {
       id: true,
-      projectId: true,
-      title: true,
-      description: true,
-      status: true,
+      name: true,
       position: true,
-      assigneeId: true,
-      dueDate: true,
-      createdAt: true,
-      updatedAt: true,
+      isClosed: true,
+      tasks: {
+        select: projectDetailTaskSelect,
+      },
     },
   },
-} satisfies Record<string, unknown>;
+} satisfies Prisma.ProjectSelect;
 
 const projectActivitySelect = {
   id: true,
@@ -299,7 +404,13 @@ const projectActivitySelect = {
     select: {
       id: true,
       title: true,
-      status: true,
+      statusId: true,
+      status: {
+        select: {
+          name: true,
+          isClosed: true,
+        },
+      },
     },
   },
 } satisfies Prisma.TaskLogSelect;
@@ -321,5 +432,14 @@ function isPrismaRecordNotFoundError(error: unknown) {
     error !== null &&
     'code' in error &&
     error.code === 'P2025'
+  );
+}
+
+function isPrismaUniqueConstraintError(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'P2002'
   );
 }

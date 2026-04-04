@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
-import { TaskLogEventType, TaskStatus } from '@prisma/client';
+import { TaskLogEventType } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { TaskLogsService } from './task-logs.service';
 
@@ -160,8 +160,8 @@ describe('TaskLogsService', () => {
       actorId: 'user-1',
       actorName: 'Jane Doe',
       taskId: 'task-1',
-      previousStatus: TaskStatus.TODO,
-      nextStatus: TaskStatus.IN_PROGRESS,
+      previousStatusName: 'Todo',
+      nextStatusName: 'In Progress',
     });
 
     expect(mockPrismaService.taskLog.create).toHaveBeenCalledWith({
@@ -169,9 +169,9 @@ describe('TaskLogsService', () => {
         taskId: 'task-1',
         eventType: TaskLogEventType.STATUS_CHANGED,
         fieldName: 'status',
-        oldValue: TaskStatus.TODO,
-        newValue: TaskStatus.IN_PROGRESS,
-        summary: 'Jane Doe moved the task from Todo to In progress',
+        oldValue: 'Todo',
+        newValue: 'In Progress',
+        summary: 'Jane Doe moved the task from Todo to In Progress',
       }),
     });
   });

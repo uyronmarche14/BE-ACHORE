@@ -26,6 +26,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { ResourceAccessGuard } from '../../auth/guards/resource-access.guard';
 import type { AuthUserResponse } from '../../auth/types/auth-response.type';
 import { CreateProjectDto } from '../dto/create-project.dto';
+import { CreateProjectStatusDto } from '../dto/create-project-status.dto';
 import { GetProjectActivityQueryDto } from '../dto/get-project-activity-query.dto';
 import { UpdateProjectDto } from '../dto/update-project.dto';
 import { ProjectsService } from '../service/projects.service';
@@ -34,6 +35,7 @@ import type {
   ProjectActivityResponse,
   ProjectDetailResponse,
   ProjectListResponse,
+  ProjectStatusSummaryResponse,
   ProjectSummaryResponse,
 } from '../types/project-response.type';
 import {
@@ -41,6 +43,7 @@ import {
   SwaggerProjectActivityResponseDto,
   SwaggerProjectDetailResponseDto,
   SwaggerProjectListResponseDto,
+  SwaggerProjectStatusSummaryDto,
   SwaggerProjectSummaryResponseDto,
   swaggerProjectActivityExtraModels,
 } from '../swagger/project-response.models';
@@ -155,6 +158,31 @@ export class ProjectsController {
     @Param('projectId') projectId: string,
   ): Promise<ProjectDetailResponse> {
     return this.projectsService.getProjectDetail(projectId);
+  }
+
+  @Post(':projectId/statuses')
+  @UseGuards(JwtAuthGuard, ResourceAccessGuard)
+  @RequireProjectAccess({
+    ownerOnly: true,
+  })
+  @ApiOperation({
+    summary: 'Create a new workflow status for a project.',
+  })
+  @ApiProjectIdParam()
+  @ApiEnvelopedResponse({
+    status: 201,
+    description: 'Project status created successfully.',
+    type: SwaggerProjectStatusSummaryDto,
+  })
+  @ApiStandardErrorResponses([400, 401, 403, 404, 409])
+  createProjectStatus(
+    @Param('projectId') projectId: string,
+    @Body() createProjectStatusDto: CreateProjectStatusDto,
+  ): Promise<ProjectStatusSummaryResponse> {
+    return this.projectsService.createProjectStatus(
+      projectId,
+      createProjectStatusDto,
+    );
   }
 
   @Put(':projectId')

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, TaskStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { createForbiddenException } from '../../../common/utils/api-exception.util';
 import { PrismaService } from '../../../database/prisma.service';
@@ -10,6 +10,7 @@ import {
   DEMO_PASSWORD,
   DEMO_PROJECT_MEMBERSHIPS,
   DEMO_PROJECTS,
+  DEMO_PROJECT_STATUSES,
   DEMO_SEED_IDS,
   DEMO_TASKS,
   DEMO_USERS,
@@ -106,6 +107,13 @@ export class SeedService {
         },
       },
     });
+    await transactionClient.projectStatus.deleteMany({
+      where: {
+        id: {
+          in: [...DEMO_SEED_IDS.projectStatusIds],
+        },
+      },
+    });
     await transactionClient.projectMember.deleteMany({
       where: {
         OR: [
@@ -173,13 +181,24 @@ export class SeedService {
         createdAt: membership.createdAt,
       })),
     });
+    await transactionClient.projectStatus.createMany({
+      data: Object.values(DEMO_PROJECT_STATUSES).map((status) => ({
+        id: status.id,
+        projectId: status.projectId,
+        name: status.name,
+        position: status.position,
+        isClosed: status.isClosed,
+        createdAt: status.createdAt,
+        updatedAt: status.updatedAt,
+      })),
+    });
     await transactionClient.task.createMany({
       data: DEMO_TASKS.map((task) => ({
         id: task.id,
         projectId: task.projectId,
         title: task.title,
         description: task.description,
-        status: task.status,
+        statusId: task.statusId,
         position: task.position,
         assigneeId: task.assigneeId,
         dueDate: task.dueDate,
@@ -247,8 +266,8 @@ export class SeedService {
       actorName: DEMO_USERS.member.name,
       createdAt: DEMO_LOG_TIMESTAMPS.statusChanged,
       taskId: 'demo-task-narrative',
-      previousStatus: TaskStatus.IN_PROGRESS,
-      nextStatus: TaskStatus.DONE,
+      previousStatusName: 'In Progress',
+      nextStatusName: 'Done',
     });
   }
 }

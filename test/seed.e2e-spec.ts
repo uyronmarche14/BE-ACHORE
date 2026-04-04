@@ -6,7 +6,6 @@ import {
   Prisma,
   ProjectMemberRole,
   TaskLogEventType,
-  TaskStatus,
 } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../src/database/prisma.service';
@@ -17,6 +16,7 @@ import { SeedController } from '../src/modules/seed/controller/seed.controller';
 import {
   DEMO_PASSWORD,
   DEMO_PROJECTS,
+  DEMO_PROJECT_STATUSES,
   DEMO_SEED_IDS,
   DEMO_USERS,
 } from '../src/modules/seed/seed-data';
@@ -60,12 +60,22 @@ type ProjectMemberRecord = {
   createdAt: Date;
 };
 
+type ProjectStatusRecord = {
+  id: string;
+  projectId: string;
+  name: string;
+  position: number;
+  isClosed: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 type TaskRecord = {
   id: string;
   projectId: string;
   title: string;
   description: string | null;
-  status: TaskStatus;
+  statusId: string;
   position: number | null;
   assigneeId: string | null;
   dueDate: Date | null;
@@ -92,6 +102,7 @@ describe('Seed demo flow (e2e)', () => {
   let refreshTokens: RefreshTokenRecord[];
   let projects: ProjectRecord[];
   let projectMembers: ProjectMemberRecord[];
+  let projectStatuses: ProjectStatusRecord[];
   let tasks: TaskRecord[];
   let taskLogs: TaskLogRecord[];
   let configValues: Record<string, boolean | string | number>;
@@ -125,6 +136,11 @@ describe('Seed demo flow (e2e)', () => {
       findUnique: jest.fn(),
     },
     project: {
+      createMany: jest.fn(),
+      deleteMany: jest.fn(),
+      findMany: jest.fn(),
+    },
+    projectStatus: {
       createMany: jest.fn(),
       deleteMany: jest.fn(),
       findMany: jest.fn(),
@@ -165,6 +181,11 @@ describe('Seed demo flow (e2e)', () => {
       findUnique: jest.Mock;
     };
     project: {
+      createMany: jest.Mock;
+      deleteMany: jest.Mock;
+      findMany: jest.Mock;
+    };
+    projectStatus: {
       createMany: jest.Mock;
       deleteMany: jest.Mock;
       findMany: jest.Mock;
@@ -214,6 +235,7 @@ describe('Seed demo flow (e2e)', () => {
     refreshTokens = [];
     projects = [];
     projectMembers = [];
+    projectStatuses = [];
     tasks = [];
     taskLogs = [];
     configValues = {
@@ -339,6 +361,42 @@ describe('Seed demo flow (e2e)', () => {
         return { count: data.length };
       },
     );
+    mockPrismaService.projectStatus.createMany.mockImplementation(
+      ({ data }: { data: ProjectStatusRecord[] }) => {
+        projectStatuses = [...projectStatuses, ...data];
+
+        return { count: data.length };
+      },
+    );
+    mockPrismaService.projectStatus.deleteMany.mockImplementation(
+      ({ where }: { where: { id: { in: string[] } } }) => {
+        projectStatuses = projectStatuses.filter(
+          (status) => !where.id.in.includes(status.id),
+        );
+
+        return { count: 0 };
+      },
+    );
+    mockPrismaService.projectStatus.findMany.mockImplementation(
+      ({ where }: { where: { projectId: string } }) =>
+        projectStatuses
+          .filter((status) => status.projectId === where.projectId)
+          .sort((left, right) => left.position - right.position)
+          .map((status) => ({
+            ...status,
+            tasks: tasks
+              .filter((task) => task.statusId === status.id)
+              .map((task) => ({
+                ...task,
+                status: {
+                  id: status.id,
+                  name: status.name,
+                  position: status.position,
+                  isClosed: status.isClosed,
+                },
+              })),
+          })),
+    );
     mockPrismaService.project.deleteMany.mockImplementation(
       ({ where }: { where: { id: { in: string[] } } }) => {
         projects = projects.filter(
@@ -382,9 +440,18 @@ describe('Seed demo flow (e2e)', () => {
           name: project.name,
           description: project.description,
           ownerId: project.ownerId,
-          tasks: tasks
-            .filter((task) => task.projectId === project.id)
-            .map((task) => ({ status: task.status })),
+          statuses: projectStatuses
+            .filter((status) => status.projectId === project.id)
+            .sort((left, right) => left.position - right.position)
+            .map((status) => ({
+              id: status.id,
+              name: status.name,
+              position: status.position,
+              isClosed: status.isClosed,
+              tasks: tasks
+                .filter((task) => task.statusId === status.id)
+                .map((task) => ({ id: task.id })),
+            })),
         }));
       },
     );
@@ -579,9 +646,21 @@ describe('Seed demo flow (e2e)', () => {
         DEMO_PROJECTS.secondary.id,
       ]),
     );
-    expect(projectTasks.taskGroups.TODO.length).toBeGreaterThan(0);
-    expect(projectTasks.taskGroups.IN_PROGRESS.length).toBeGreaterThan(0);
-    expect(projectTasks.taskGroups.DONE.length).toBeGreaterThan(0);
+    expect(
+      projectTasks.statuses.find(
+        (status) => status.id === DEMO_PROJECT_STATUSES.primaryTodo.id,
+      )?.tasks.length ?? 0,
+    ).toBeGreaterThan(0);
+    expect(
+      projectTasks.statuses.find(
+        (status) => status.id === DEMO_PROJECT_STATUSES.primaryInProgress.id,
+      )?.tasks.length ?? 0,
+    ).toBeGreaterThan(0);
+    expect(
+      projectTasks.statuses.find(
+        (status) => status.id === DEMO_PROJECT_STATUSES.primaryDone.id,
+      )?.tasks.length ?? 0,
+    ).toBeGreaterThan(0);
     expect(taskLogTimeline.items).not.toHaveLength(0);
     expect(taskLogTimeline.items[0].eventType).toBe(
       TaskLogEventType.STATUS_CHANGED,

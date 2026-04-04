@@ -1,5 +1,26 @@
-import { TaskStatus } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
+
+export class SwaggerTaskStatusDto {
+  @ApiProperty({
+    example: 'status_7b0be4ef-8eb6-4db1-a442-c534a53e7cf1',
+  })
+  id!: string;
+
+  @ApiProperty({
+    example: 'In Progress',
+  })
+  name!: string;
+
+  @ApiProperty({
+    example: 2,
+  })
+  position!: number;
+
+  @ApiProperty({
+    example: false,
+  })
+  isClosed!: boolean;
+}
 
 export class SwaggerTaskResponseDto {
   @ApiProperty({
@@ -24,10 +45,14 @@ export class SwaggerTaskResponseDto {
   description!: string | null;
 
   @ApiProperty({
-    enum: TaskStatus,
-    example: TaskStatus.IN_PROGRESS,
+    example: 'status_7b0be4ef-8eb6-4db1-a442-c534a53e7cf1',
   })
-  status!: TaskStatus;
+  statusId!: string;
+
+  @ApiProperty({
+    type: () => SwaggerTaskStatusDto,
+  })
+  status!: SwaggerTaskStatusDto;
 
   @ApiProperty({
     nullable: true,
@@ -61,28 +86,18 @@ export class SwaggerTaskResponseDto {
   updatedAt!: string;
 }
 
-export class SwaggerTaskGroupsDto {
+export class SwaggerProjectTaskStatusDto extends SwaggerTaskStatusDto {
   @ApiProperty({
     type: () => [SwaggerTaskResponseDto],
   })
-  TODO!: SwaggerTaskResponseDto[];
-
-  @ApiProperty({
-    type: () => [SwaggerTaskResponseDto],
-  })
-  IN_PROGRESS!: SwaggerTaskResponseDto[];
-
-  @ApiProperty({
-    type: () => [SwaggerTaskResponseDto],
-  })
-  DONE!: SwaggerTaskResponseDto[];
+  tasks!: SwaggerTaskResponseDto[];
 }
 
 export class SwaggerProjectTasksResponseDto {
   @ApiProperty({
-    type: () => SwaggerTaskGroupsDto,
+    type: () => [SwaggerProjectTaskStatusDto],
   })
-  taskGroups!: SwaggerTaskGroupsDto;
+  statuses!: SwaggerProjectTaskStatusDto[];
 }
 
 export class SwaggerDeleteTaskResponseDto {

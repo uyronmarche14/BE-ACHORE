@@ -1,8 +1,6 @@
-import { TaskStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
   IsDateString,
-  IsEnum,
   IsNotEmpty,
   IsString,
   MaxLength,
@@ -27,8 +25,9 @@ export class CreateTaskDto {
   description?: string;
 
   @ValidateIf((_object: CreateTaskDto, value: unknown) => value !== undefined)
-  @IsEnum(TaskStatus)
-  status?: TaskStatus;
+  @IsString()
+  @IsNotEmpty()
+  statusId?: string;
 
   @Transform(({ value }: { value: unknown }) =>
     normalizeCreateTaskAssigneeId(value),

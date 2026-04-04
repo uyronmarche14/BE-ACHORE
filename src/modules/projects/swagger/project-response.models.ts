@@ -1,30 +1,36 @@
-import {
-  ProjectMemberRole,
-  TaskLogEventType,
-  TaskStatus,
-} from '@prisma/client';
+import { ProjectMemberRole, TaskLogEventType } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
-import { SwaggerTaskGroupsDto } from '../../tasks/swagger/task-response.models';
+import { SwaggerProjectTaskStatusDto } from '../../tasks/swagger/task-response.models';
 import {
   SwaggerTaskLogAssigneeValueDto,
   createTaskLogValueSchema,
 } from '../../task-logs/swagger/task-log-response.models';
 
-export class SwaggerProjectTaskCountsDto {
+export class SwaggerProjectStatusSummaryDto {
+  @ApiProperty({
+    example: 'status_7b0be4ef-8eb6-4db1-a442-c534a53e7cf1',
+  })
+  id!: string;
+
+  @ApiProperty({
+    example: 'In Progress',
+  })
+  name!: string;
+
+  @ApiProperty({
+    example: 2,
+  })
+  position!: number;
+
+  @ApiProperty({
+    example: false,
+  })
+  isClosed!: boolean;
+
   @ApiProperty({
     example: 3,
   })
-  TODO!: number;
-
-  @ApiProperty({
-    example: 1,
-  })
-  IN_PROGRESS!: number;
-
-  @ApiProperty({
-    example: 5,
-  })
-  DONE!: number;
+  taskCount!: number;
 }
 
 export class SwaggerProjectSummaryResponseDto {
@@ -51,9 +57,9 @@ export class SwaggerProjectSummaryResponseDto {
   role!: ProjectMemberRole;
 
   @ApiProperty({
-    type: () => SwaggerProjectTaskCountsDto,
+    type: () => [SwaggerProjectStatusSummaryDto],
   })
-  taskCounts!: SwaggerProjectTaskCountsDto;
+  statuses!: SwaggerProjectStatusSummaryDto[];
 }
 
 export class SwaggerProjectListResponseDto {
@@ -104,9 +110,9 @@ export class SwaggerProjectDetailResponseDto {
   members!: SwaggerProjectMemberResponseDto[];
 
   @ApiProperty({
-    type: () => SwaggerTaskGroupsDto,
+    type: () => [SwaggerProjectTaskStatusDto],
   })
-  taskGroups!: SwaggerTaskGroupsDto;
+  statuses!: SwaggerProjectTaskStatusDto[];
 }
 
 export class SwaggerDeleteProjectResponseDto {
@@ -140,10 +146,19 @@ export class SwaggerProjectActivityTaskDto {
   title!: string;
 
   @ApiProperty({
-    enum: TaskStatus,
-    example: TaskStatus.IN_PROGRESS,
+    example: 'status_7b0be4ef-8eb6-4db1-a442-c534a53e7cf1',
   })
-  status!: TaskStatus;
+  statusId!: string;
+
+  @ApiProperty({
+    example: 'In Progress',
+  })
+  statusName!: string;
+
+  @ApiProperty({
+    example: false,
+  })
+  isClosed!: boolean;
 }
 
 export class SwaggerProjectActivityEntryResponseDto {

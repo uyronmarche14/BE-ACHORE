@@ -1,11 +1,20 @@
 import type {
   DeleteTaskResponse,
+  ProjectTaskStatusRecord,
   ProjectTasksResponse,
-  TaskGroupRecords,
   TaskRecord,
   TaskResponse,
-  TaskGroupsResponse,
+  TaskStatusRecord,
 } from '../types/task-response.type';
+
+export function mapTaskStatusResponse(status: TaskStatusRecord) {
+  return {
+    id: status.id,
+    name: status.name,
+    position: status.position,
+    isClosed: status.isClosed,
+  };
+}
 
 export function mapTaskResponse(task: TaskRecord): TaskResponse {
   return {
@@ -13,7 +22,8 @@ export function mapTaskResponse(task: TaskRecord): TaskResponse {
     projectId: task.projectId,
     title: task.title,
     description: task.description,
-    status: task.status,
+    statusId: task.statusId,
+    status: mapTaskStatusResponse(task.status),
     position: task.position,
     assigneeId: task.assigneeId,
     dueDate: task.dueDate ? task.dueDate.toISOString().slice(0, 10) : null,
@@ -29,27 +39,15 @@ export function mapDeleteTaskResponse(): DeleteTaskResponse {
 }
 
 export function mapProjectTasksResponse(
-  taskGroups: TaskGroupRecords,
+  statuses: ProjectTaskStatusRecord[],
 ): ProjectTasksResponse {
-  const responseTaskGroups = createEmptyTaskGroupsResponse();
-
-  for (const status of TASK_STATUSES) {
-    responseTaskGroups[status] = taskGroups[status].map((task) =>
-      mapTaskResponse(task),
-    );
-  }
-
   return {
-    taskGroups: responseTaskGroups,
+    statuses: statuses.map((status) => ({
+      id: status.id,
+      name: status.name,
+      position: status.position,
+      isClosed: status.isClosed,
+      tasks: status.tasks.map((task) => mapTaskResponse(task)),
+    })),
   };
 }
-
-function createEmptyTaskGroupsResponse(): TaskGroupsResponse {
-  return {
-    TODO: [],
-    IN_PROGRESS: [],
-    DONE: [],
-  };
-}
-
-const TASK_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE'] as const;

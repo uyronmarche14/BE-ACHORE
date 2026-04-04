@@ -1,4 +1,4 @@
-import { AppRole, ProjectMemberRole, TaskStatus } from '@prisma/client';
+import { AppRole, ProjectMemberRole } from '@prisma/client';
 
 export const DEMO_PASSWORD = 'DemoPass123!';
 
@@ -44,6 +44,63 @@ export const DEMO_PROJECTS = {
   },
 } as const;
 
+export const DEMO_PROJECT_STATUSES = {
+  primaryTodo: {
+    id: 'demo-status-primary-todo',
+    projectId: DEMO_PROJECTS.primary.id,
+    name: 'Todo',
+    position: 1,
+    isClosed: false,
+    createdAt: new Date('2026-04-01T09:00:00.000Z'),
+    updatedAt: new Date('2026-04-01T09:00:00.000Z'),
+  },
+  primaryInProgress: {
+    id: 'demo-status-primary-in-progress',
+    projectId: DEMO_PROJECTS.primary.id,
+    name: 'In Progress',
+    position: 2,
+    isClosed: false,
+    createdAt: new Date('2026-04-01T09:00:00.000Z'),
+    updatedAt: new Date('2026-04-01T09:00:00.000Z'),
+  },
+  primaryDone: {
+    id: 'demo-status-primary-done',
+    projectId: DEMO_PROJECTS.primary.id,
+    name: 'Done',
+    position: 3,
+    isClosed: true,
+    createdAt: new Date('2026-04-01T09:00:00.000Z'),
+    updatedAt: new Date('2026-04-01T09:00:00.000Z'),
+  },
+  secondaryTodo: {
+    id: 'demo-status-secondary-todo',
+    projectId: DEMO_PROJECTS.secondary.id,
+    name: 'Todo',
+    position: 1,
+    isClosed: false,
+    createdAt: new Date('2026-04-01T09:10:00.000Z'),
+    updatedAt: new Date('2026-04-01T09:10:00.000Z'),
+  },
+  secondaryInProgress: {
+    id: 'demo-status-secondary-in-progress',
+    projectId: DEMO_PROJECTS.secondary.id,
+    name: 'In Progress',
+    position: 2,
+    isClosed: false,
+    createdAt: new Date('2026-04-01T09:10:00.000Z'),
+    updatedAt: new Date('2026-04-01T09:10:00.000Z'),
+  },
+  secondaryDone: {
+    id: 'demo-status-secondary-done',
+    projectId: DEMO_PROJECTS.secondary.id,
+    name: 'Done',
+    position: 3,
+    isClosed: true,
+    createdAt: new Date('2026-04-01T09:10:00.000Z'),
+    updatedAt: new Date('2026-04-01T09:10:00.000Z'),
+  },
+} as const;
+
 export const DEMO_PROJECT_MEMBERSHIPS = [
   {
     id: 'demo-membership-primary-owner',
@@ -74,7 +131,7 @@ export const DEMO_TASKS = [
     projectId: DEMO_PROJECTS.primary.id,
     title: 'Capture deployment checklist',
     description: 'List rollback, environment, and smoke-test steps for review.',
-    status: TaskStatus.TODO,
+    statusId: DEMO_PROJECT_STATUSES.primaryTodo.id,
     position: 1,
     assigneeId: null,
     dueDate: new Date('2026-04-10T00:00:00.000Z'),
@@ -89,7 +146,7 @@ export const DEMO_TASKS = [
     title: 'Rehearse reviewer walkthrough',
     description:
       'Keep the live assessment flow steady during the product demo.',
-    status: TaskStatus.IN_PROGRESS,
+    statusId: DEMO_PROJECT_STATUSES.primaryInProgress.id,
     position: 1,
     assigneeId: DEMO_USERS.member.id,
     dueDate: new Date('2026-04-08T00:00:00.000Z'),
@@ -103,7 +160,7 @@ export const DEMO_TASKS = [
     projectId: DEMO_PROJECTS.primary.id,
     title: 'Finalize demo board narrative',
     description: 'Board, logs, and auth are ready for review.',
-    status: TaskStatus.DONE,
+    statusId: DEMO_PROJECT_STATUSES.primaryDone.id,
     position: 1,
     assigneeId: DEMO_USERS.member.id,
     dueDate: new Date('2026-04-06T00:00:00.000Z'),
@@ -117,7 +174,7 @@ export const DEMO_TASKS = [
     projectId: DEMO_PROJECTS.primary.id,
     title: 'Review post-deploy notes',
     description: null,
-    status: TaskStatus.TODO,
+    statusId: DEMO_PROJECT_STATUSES.primaryTodo.id,
     position: 2,
     assigneeId: null,
     dueDate: null,
@@ -131,7 +188,7 @@ export const DEMO_TASKS = [
     projectId: DEMO_PROJECTS.secondary.id,
     title: 'Confirm admin fallback access',
     description: 'Validate operational access for the seeded admin account.',
-    status: TaskStatus.IN_PROGRESS,
+    statusId: DEMO_PROJECT_STATUSES.secondaryInProgress.id,
     position: 1,
     assigneeId: DEMO_USERS.admin.id,
     dueDate: new Date('2026-04-11T00:00:00.000Z'),
@@ -145,7 +202,7 @@ export const DEMO_TASKS = [
     projectId: DEMO_PROJECTS.secondary.id,
     title: 'Archive prior dry run',
     description: 'Keep the operations board tidy before handoff.',
-    status: TaskStatus.DONE,
+    statusId: DEMO_PROJECT_STATUSES.secondaryDone.id,
     position: 1,
     assigneeId: null,
     dueDate: null,
@@ -166,6 +223,9 @@ export const DEMO_LOG_TIMESTAMPS = {
 
 export const DEMO_SEED_IDS = {
   projectIds: Object.values(DEMO_PROJECTS).map((project) => project.id),
+  projectStatusIds: Object.values(DEMO_PROJECT_STATUSES).map(
+    (status) => status.id,
+  ),
   taskIds: DEMO_TASKS.map((task) => task.id),
   userIds: Object.values(DEMO_USERS).map((user) => user.id),
 } as const;

@@ -1,10 +1,10 @@
 import { Transform, Type } from 'class-transformer';
-import { TaskStatus } from '@prisma/client';
-import { IsEnum, IsInt, Min, ValidateIf } from 'class-validator';
+import { IsInt, IsNotEmpty, IsString, Min, ValidateIf } from 'class-validator';
 
 export class UpdateTaskStatusDto {
-  @IsEnum(TaskStatus)
-  status!: TaskStatus;
+  @IsString()
+  @IsNotEmpty()
+  statusId!: string;
 
   @Transform(({ value }: { value: unknown }) =>
     normalizeNullableTaskPosition(value),

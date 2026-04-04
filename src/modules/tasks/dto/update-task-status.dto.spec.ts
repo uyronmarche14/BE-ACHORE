@@ -1,5 +1,4 @@
 import { BadRequestException, type ArgumentMetadata } from '@nestjs/common';
-import { TaskStatus } from '@prisma/client';
 import { createGlobalValidationPipe } from '../../../common/pipes/global-validation.pipe';
 import { UpdateTaskStatusDto } from './update-task-status.dto';
 
@@ -15,22 +14,22 @@ describe('UpdateTaskStatusDto validation', () => {
     await expect(
       validationPipe.transform(
         {
-          status: TaskStatus.IN_PROGRESS,
+          statusId: 'status-in-progress',
           position: null,
         },
         metadata,
       ),
     ).resolves.toEqual({
-      status: TaskStatus.IN_PROGRESS,
+      statusId: 'status-in-progress',
       position: null,
     });
   });
 
-  it('rejects invalid status values and non-positive positions', async () => {
+  it('rejects blank status ids and non-positive positions', async () => {
     await expect(
       validationPipe.transform(
         {
-          status: 'LATER',
+          statusId: '   ',
           position: 0,
         },
         metadata,

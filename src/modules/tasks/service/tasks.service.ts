@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, TaskStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import {
   createNotFoundException,
   createValidationException,
 } from '../../../common/utils/api-exception.util';
-import { groupTaskRecordsByStatus } from '../../../common/utils/task-groups.util';
 import { PrismaService } from '../../../database/prisma.service';
 import type { AuthUserResponse } from '../../auth/types/auth-response.type';
 import {
@@ -40,12 +39,15 @@ export class TasksService {
     await this.assertValidAssignee(projectId, createTaskDto.assigneeId);
 
     return this.prismaService.$transaction(async (transactionClient) => {
+      const status = createTaskDto.statusId
+        ? await this.assertValidStatus(projectId, createTaskDto.statusId)
+        : await this.getDefaultStatus(transactionClient, projectId);
       const createdTask = await transactionClient.task.create({
         data: {
           projectId,
           title: createTaskDto.title,
           description: createTaskDto.description ?? null,
-          status: createTaskDto.status ?? TaskStatus.TODO,
+          statusId: status.id,
           assigneeId: createTaskDto.assigneeId ?? null,
           dueDate: createTaskDto.dueDate
             ? new Date(createTaskDto.dueDate)
@@ -66,14 +68,9 @@ export class TasksService {
   }
 
   async listProjectTasks(projectId: string): Promise<ProjectTasksResponse> {
-    const tasks = await this.prismaService.task.findMany({
-      where: {
-        projectId,
-      },
-      select: taskResponseSelect,
-    });
+    const statuses = await this.listProjectTaskStatuses(projectId);
 
-    return mapProjectTasksResponse(groupTaskRecordsByStatus(tasks));
+    return mapProjectTasksResponse(statuses);
   }
 
   async getTask(taskId: string): Promise<TaskResponse> {
@@ -178,15 +175,17 @@ export class TasksService {
       where: {
         id: taskId,
       },
-      select: {
-        id: true,
-        status: true,
-      },
+      select: taskStatusComparisonSelect,
     });
 
     if (!existingTask) {
       throw this.createTaskNotFoundException();
     }
+
+    const nextStatus = await this.assertValidStatus(
+      existingTask.projectId,
+      updateTaskStatusDto.statusId,
+    );
 
     try {
       return this.prismaService.$transaction(async (transactionClient) => {
@@ -195,20 +194,20 @@ export class TasksService {
             id: taskId,
           },
           data: {
-            status: updateTaskStatusDto.status,
+            statusId: nextStatus.id,
             position: updateTaskStatusDto.position ?? null,
             updatedById: currentUser.id,
           },
           select: taskResponseSelect,
         });
 
-        if (existingTask.status !== updateTaskStatusDto.status) {
+        if (existingTask.statusId !== nextStatus.id) {
           await this.taskLogsService.createStatusChangedLog(transactionClient, {
             actorId: currentUser.id,
             actorName: currentUser.name,
             taskId: updatedTask.id,
-            previousStatus: existingTask.status,
-            nextStatus: updateTaskStatusDto.status,
+            previousStatusName: existingTask.status.name,
+            nextStatusName: nextStatus.name,
           });
         }
 
@@ -241,6 +240,49 @@ export class TasksService {
     return mapDeleteTaskResponse();
   }
 
+  private async listProjectTaskStatuses(projectId: string) {
+    return this.prismaService.projectStatus.findMany({
+      where: {
+        projectId,
+      },
+      orderBy: {
+        position: 'asc',
+      },
+      select: projectTaskStatusSelect,
+    });
+  }
+
+  private async getDefaultStatus(
+    prismaClient: Prisma.TransactionClient,
+    projectId: string,
+  ) {
+    const status = await prismaClient.projectStatus.findFirst({
+      where: {
+        projectId,
+      },
+      orderBy: {
+        position: 'asc',
+      },
+      select: {
+        id: true,
+        name: true,
+        position: true,
+        isClosed: true,
+      },
+    });
+
+    if (!status) {
+      throw createValidationException({
+        message: 'Request validation failed',
+        details: {
+          statusId: ['Project does not have any available statuses'],
+        },
+      });
+    }
+
+    return status;
+  }
+
   private async assertValidAssignee(
     projectId: string,
     assigneeId?: string | null,
@@ -269,6 +311,32 @@ export class TasksService {
         },
       });
     }
+  }
+
+  private async assertValidStatus(projectId: string, statusId: string) {
+    const status = await this.prismaService.projectStatus.findFirst({
+      where: {
+        id: statusId,
+        projectId,
+      },
+      select: {
+        id: true,
+        name: true,
+        position: true,
+        isClosed: true,
+      },
+    });
+
+    if (!status) {
+      throw createValidationException({
+        message: 'Request validation failed',
+        details: {
+          statusId: ['Status must belong to the project'],
+        },
+      });
+    }
+
+    return status;
   }
 
   private createTaskNotFoundException() {
@@ -348,18 +416,38 @@ export class TasksService {
   }
 }
 
+const taskStatusSelect = {
+  id: true,
+  name: true,
+  position: true,
+  isClosed: true,
+} satisfies Prisma.ProjectStatusSelect;
+
 const taskResponseSelect = {
   id: true,
   projectId: true,
   title: true,
   description: true,
-  status: true,
+  statusId: true,
+  status: {
+    select: taskStatusSelect,
+  },
   position: true,
   assigneeId: true,
   dueDate: true,
   createdAt: true,
   updatedAt: true,
-} satisfies Record<string, unknown>;
+} satisfies Prisma.TaskSelect;
+
+const projectTaskStatusSelect = {
+  id: true,
+  name: true,
+  position: true,
+  isClosed: true,
+  tasks: {
+    select: taskResponseSelect,
+  },
+} satisfies Prisma.ProjectStatusSelect;
 
 const updateTaskComparisonSelect = {
   projectId: true,
@@ -367,6 +455,17 @@ const updateTaskComparisonSelect = {
   description: true,
   assigneeId: true,
   dueDate: true,
+} satisfies Prisma.TaskSelect;
+
+const taskStatusComparisonSelect = {
+  id: true,
+  projectId: true,
+  statusId: true,
+  status: {
+    select: {
+      name: true,
+    },
+  },
 } satisfies Prisma.TaskSelect;
 
 function isPrismaRecordNotFoundError(error: unknown) {
