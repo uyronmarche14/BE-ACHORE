@@ -63,6 +63,7 @@ export class AuthService {
   ) {}
 
   async signup(signupDto: SignupDto): Promise<SignupResult> {
+    const signupStartedAt = Date.now();
     const passwordHash = await bcrypt.hash(signupDto.password, 12);
     const newUserId = randomUUID();
 
@@ -77,10 +78,17 @@ export class AuthService {
           emailVerifiedAt: null,
         },
       });
+      this.logger.log(
+        `Created signup candidate ${user.id} for ${user.email}; preparing verification email.`,
+      );
 
       try {
         await this.createAndSendVerificationToken(user, signupDto.redirectPath);
       } catch (error) {
+        this.logger.error(
+          `Verification email setup failed for user ${user.id} (${user.email}) after ${Date.now() - signupStartedAt}ms. Rolling back the account.`,
+          error instanceof Error ? error.stack : undefined,
+        );
         // Do not leave behind an account that can never finish signup because the
         // verification mail step failed after the user record was created.
         await this.prismaService.user
@@ -98,6 +106,10 @@ export class AuthService {
 
         throw error;
       }
+
+      this.logger.log(
+        `Signup flow for ${user.email} completed in ${Date.now() - signupStartedAt}ms.`,
+      );
 
       return {
         message: 'Check your email to verify your account',
@@ -472,6 +484,7 @@ export class AuthService {
     user: Pick<User, 'id' | 'email' | 'name'>,
     redirectPath?: string,
   ) {
+    const verificationStartedAt = Date.now();
     const rawToken = generateOpaqueToken();
     const tokenHash = hashOpaqueToken(rawToken);
     const verificationLink = this.buildVerificationLink(rawToken, redirectPath);
@@ -494,6 +507,9 @@ export class AuthService {
         },
       }),
     ]);
+    this.logger.log(
+      `Stored email verification token for ${user.email} in ${Date.now() - verificationStartedAt}ms; sending email next.`,
+    );
 
     await this.mailService.sendMail({
       to: user.email,
@@ -501,6 +517,9 @@ export class AuthService {
       text: `Hi ${user.name}, verify your account by opening ${verificationLink}`,
       html: `<p>Hi ${escapeHtml(user.name)},</p><p>Verify your account by opening <a href="${verificationLink}">${verificationLink}</a>.</p>`,
     });
+    this.logger.log(
+      `Verification email flow for ${user.email} completed in ${Date.now() - verificationStartedAt}ms.`,
+    );
   }
 
   private buildVerificationLink(token: string, redirectPath?: string) {

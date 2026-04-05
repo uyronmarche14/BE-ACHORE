@@ -22,6 +22,7 @@ export class MailService {
   }
 
   async sendMail(params: SendMailParams) {
+    const sendStartedAt = Date.now();
     const missingConfiguration = this.getMissingConfigurationKeys();
     const transporter = this.getTransporter();
     const fromAddress = this.runtimeConfig.smtpFrom;
@@ -37,6 +38,9 @@ export class MailService {
     }
 
     try {
+      this.logger.log(
+        `Attempting SMTP delivery to ${params.to} with subject "${params.subject}".`,
+      );
       await transporter.sendMail({
         from: fromAddress,
         to: params.to,
@@ -44,9 +48,12 @@ export class MailService {
         text: params.text,
         html: params.html,
       });
+      this.logger.log(
+        `SMTP delivery to ${params.to} succeeded in ${Date.now() - sendStartedAt}ms.`,
+      );
     } catch (error) {
       this.logger.error(
-        `Failed to send mail to ${params.to} with subject "${params.subject}".`,
+        `Failed to send mail to ${params.to} with subject "${params.subject}" after ${Date.now() - sendStartedAt}ms.`,
         error instanceof Error ? error.stack : undefined,
       );
       throw createInternalException({
@@ -80,6 +87,9 @@ export class MailService {
         pass: this.runtimeConfig.smtpPass,
       },
     });
+    this.logger.log(
+      `Initialized SMTP transporter for ${this.runtimeConfig.smtpHost}:${this.runtimeConfig.smtpPort} secure=${this.runtimeConfig.smtpSecure ?? this.runtimeConfig.smtpPort === 465}.`,
+    );
 
     return this.transporter;
   }
