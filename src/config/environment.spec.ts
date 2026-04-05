@@ -3,7 +3,7 @@ import {
   environmentValidationSchema,
   getEnvironmentFilePaths,
 } from './environment';
-import { getAuthRuntimeConfig } from './runtime-config';
+import { getAppRuntimeConfig, getAuthRuntimeConfig } from './runtime-config';
 
 describe('environment configuration', () => {
   const originalEnv = { ...process.env };
@@ -153,5 +153,63 @@ describe('environment configuration', () => {
     } as unknown as ConfigService;
 
     expect(getAuthRuntimeConfig(configService).refreshCookieSecure).toBe(false);
+  });
+
+  it('defaults trust proxy hops to 1 in production when the override is absent', () => {
+    const configService = {
+      getOrThrow: jest.fn((key: string) => {
+        const config: Record<string, string | number> = {
+          PORT: 4000,
+          APP_URL: 'https://api.archon.example.com',
+          FRONTEND_URL: 'https://archon.example.com',
+          JWT_ACCESS_SECRET: 'production-access-secret-123',
+          JWT_REFRESH_SECRET: 'production-refresh-secret-123',
+          JWT_ACCESS_TTL: '15m',
+          JWT_REFRESH_TTL: '7d',
+          REFRESH_COOKIE_NAME: 'archon_refresh_token',
+          NODE_ENV: 'production',
+        };
+
+        return config[key];
+      }),
+      get: jest.fn((key: string) => {
+        if (key === 'REFRESH_COOKIE_SECURE' || key === 'TRUST_PROXY_HOPS') {
+          return undefined;
+        }
+
+        return undefined;
+      }),
+    } as unknown as ConfigService;
+
+    expect(getAppRuntimeConfig(configService).trustProxyHops).toBe(1);
+  });
+
+  it('defaults trust proxy hops to 0 outside production when the override is absent', () => {
+    const configService = {
+      getOrThrow: jest.fn((key: string) => {
+        const config: Record<string, string | number> = {
+          PORT: 4000,
+          APP_URL: 'http://localhost:4000',
+          FRONTEND_URL: 'http://localhost:3000',
+          JWT_ACCESS_SECRET: 'development-access-secret-123',
+          JWT_REFRESH_SECRET: 'development-refresh-secret-123',
+          JWT_ACCESS_TTL: '15m',
+          JWT_REFRESH_TTL: '7d',
+          REFRESH_COOKIE_NAME: 'archon_refresh_token',
+          NODE_ENV: 'development',
+        };
+
+        return config[key];
+      }),
+      get: jest.fn((key: string) => {
+        if (key === 'REFRESH_COOKIE_SECURE' || key === 'TRUST_PROXY_HOPS') {
+          return undefined;
+        }
+
+        return undefined;
+      }),
+    } as unknown as ConfigService;
+
+    expect(getAppRuntimeConfig(configService).trustProxyHops).toBe(0);
   });
 });

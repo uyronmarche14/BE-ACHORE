@@ -12,6 +12,7 @@ export type AppRuntimeConfig = {
   jwtRefreshTtl: StringValue;
   refreshCookieName: string;
   refreshCookieSecure: boolean;
+  trustProxyHops: number;
   nodeEnv: 'development' | 'test' | 'production';
 };
 
@@ -29,6 +30,10 @@ export type MailRuntimeConfig = {
 export function getAppRuntimeConfig(
   configService: ConfigService,
 ): AppRuntimeConfig {
+  const nodeEnv = configService.getOrThrow<
+    'development' | 'test' | 'production'
+  >('NODE_ENV');
+
   return {
     port: configService.getOrThrow<number>('PORT'),
     appUrl: configService.getOrThrow<string>('APP_URL'),
@@ -39,14 +44,13 @@ export function getAppRuntimeConfig(
     jwtAccessTtl: configService.getOrThrow<StringValue>('JWT_ACCESS_TTL'),
     jwtRefreshTtl: configService.getOrThrow<StringValue>('JWT_REFRESH_TTL'),
     refreshCookieName: configService.getOrThrow<string>('REFRESH_COOKIE_NAME'),
-    nodeEnv: configService.getOrThrow<'development' | 'test' | 'production'>(
-      'NODE_ENV',
-    ),
+    nodeEnv,
     refreshCookieSecure:
       configService.get<boolean>('REFRESH_COOKIE_SECURE') ??
-      configService.getOrThrow<'development' | 'test' | 'production'>(
-        'NODE_ENV',
-      ) === 'production',
+      nodeEnv === 'production',
+    trustProxyHops:
+      configService.get<number>('TRUST_PROXY_HOPS') ??
+      (nodeEnv === 'production' ? 1 : 0),
   };
 }
 

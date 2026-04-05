@@ -24,6 +24,7 @@ import {
 import { AuthRateLimit } from '../decorators/auth-rate-limit.decorator';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { LoginDto } from '../dto/login.dto';
+import { AuthOriginGuard } from '../guards/auth-origin.guard';
 import { AuthRateLimitGuard } from '../guards/auth-rate-limit.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import {
@@ -133,7 +134,7 @@ export class AuthController {
   }
 
   @Post('refresh')
-  @UseGuards(AuthRateLimitGuard)
+  @UseGuards(AuthOriginGuard, AuthRateLimitGuard)
   @AuthRateLimit({
     key: 'refresh',
     limit: 20,
@@ -148,7 +149,7 @@ export class AuthController {
     description: 'Access token refreshed successfully.',
     type: SwaggerRefreshAccessTokenResponseDto,
   })
-  @ApiStandardErrorResponses([401, 429])
+  @ApiStandardErrorResponses([401, 403, 429])
   async refresh(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
@@ -171,6 +172,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @UseGuards(AuthOriginGuard)
   @ApiOperation({
     summary: 'Revoke the current refresh token and clear the session cookie.',
   })
@@ -180,6 +182,7 @@ export class AuthController {
     description: 'Logged out successfully.',
     type: SwaggerLogoutResponseDto,
   })
+  @ApiStandardErrorResponses([403])
   async logout(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,

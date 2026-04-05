@@ -8,6 +8,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { IsSafeExternalUrl } from '../validation/is-safe-external-url.decorator';
 
 export class CreateTaskAttachmentDto {
   @Transform(({ value }: { value: unknown }) =>
@@ -34,6 +35,7 @@ export class CreateTaskAttachmentDto {
   @IsUrl({
     require_protocol: true,
   })
+  @IsSafeExternalUrl()
   @MaxLength(2048)
   url!: string;
 

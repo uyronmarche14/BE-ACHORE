@@ -6,6 +6,7 @@ import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { Request, Response } from 'express';
 import { AuthController } from './auth.controller';
+import { AuthOriginGuard } from '../guards/auth-origin.guard';
 import { AuthRateLimitGuard } from '../guards/auth-rate-limit.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { AuthRateLimitService } from '../service/auth-rate-limit.service';
@@ -21,6 +22,7 @@ describe('AuthController', () => {
       controllers: [AuthController],
       providers: [
         Reflector,
+        AuthOriginGuard,
         AuthRateLimitGuard,
         AuthRateLimitService,
         {

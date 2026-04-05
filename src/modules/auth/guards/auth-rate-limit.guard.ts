@@ -38,16 +38,6 @@ export class AuthRateLimitGuard implements CanActivate {
 }
 
 function getClientIdentifier(request: Request) {
-  const forwardedFor = request.headers['x-forwarded-for'];
-
-  if (typeof forwardedFor === 'string' && forwardedFor.trim().length > 0) {
-    return forwardedFor.split(',')[0].trim();
-  }
-
-  if (Array.isArray(forwardedFor) && forwardedFor[0]) {
-    return forwardedFor[0].trim();
-  }
-
   if (request.ip) {
     return request.ip;
   }

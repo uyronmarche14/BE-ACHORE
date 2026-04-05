@@ -17,6 +17,7 @@ export const environmentValidationSchema = Joi.object({
   JWT_REFRESH_TTL: Joi.string().default('7d'),
   REFRESH_COOKIE_NAME: Joi.string().default('archon_refresh_token'),
   REFRESH_COOKIE_SECURE: Joi.boolean().optional(),
+  TRUST_PROXY_HOPS: Joi.number().integer().min(0).optional(),
   SMTP_HOST: Joi.string().hostname().optional(),
   SMTP_PORT: Joi.number().port().optional(),
   SMTP_SECURE: Joi.boolean().optional(),
