@@ -1,210 +1,150 @@
-# Archon Backend
+# DOWINN Backend
 
-This workspace owns the NestJS backend for Archon. It is the source of truth
-for authentication, authorization, projects, workflow statuses, tasks, project
-activity, task collaboration data, and reviewer demo seeding.
+This package contains the NestJS backend for DOWINN. It is the source of truth
+for authentication, project membership, workflow statuses, tasks, project
+activity, and reviewer demo seeding.
 
-Canonical docs live in:
+## Project Overview
 
-- `../README.md`
-- `../docs/ARCHITECTURE.md`
-- `../docs/BACKEND-PLAN.md`
-- `../docs/API.md`
-- `../docs/DEPLOYMENT.md`
-- `../docs/REVIEWER-PACK.md`
+The backend owns:
 
-## What This Workspace Owns
+- signup, login, refresh rotation, logout, and current-user session APIs
+- email verification and invite flows
+- project CRUD, membership checks, project statuses, and project activity
+- task CRUD, task status changes, comments, attachments, and audit logs
+- non-production reviewer/demo seeding through a gated seed endpoint
 
-Responsibilities include:
+The API is exposed under `/api/v1` and includes Swagger documentation when
+`SWAGGER_ENABLED=true`.
 
-- bootstrapping `/api/v1`
-- enforcing validation, normalized envelopes, and canonical error codes
-- signup, login, refresh rotation, logout, me, verification resend, and
-  verification confirm
-- invite create, invite preview, and invite acceptance
-- project CRUD, project membership enforcement, project status management, and
-  project activity retrieval
-- task CRUD, task status mutation, checklist/link persistence, comments,
-  attachments, and audit-log creation
-- deterministic non-production reviewer bootstrap through `POST /seed/init`
-
-## Tech Stack
+## Stack
 
 - NestJS 11
-- TypeScript 5
+- TypeScript
 - Prisma 7
 - MySQL / MariaDB
 - `class-validator` and `class-transformer`
-- `joi` for env validation
-- JWT access tokens plus refresh token rotation
-- `bcrypt`
+- `joi` environment validation
+- JWT access tokens and refresh-token rotation
+- Nodemailer for verification and invite delivery
 
-## Runtime Shape
+## Local Defaults
 
-```text
-Request
--> Controller
--> DTO validation
--> Guards / decorators / authorization checks
--> Service
--> Prisma
--> Mapper / response type
--> normalized API envelope
-```
+The checked-in `.env.example` uses these local defaults:
 
-The public modules stay stable, while larger domains are split internally by
-responsibility:
+- backend port: `4000`
+- app URL: `http://localhost:4000`
+- frontend URL: `http://localhost:3000`
+- Swagger UI: `http://localhost:4000/api/v1/docs`
+- health check: `http://localhost:4000/api/v1/health`
+- database: `mysql://dowinn:dowinn@127.0.0.1:3308/dowinn`
 
-- `projects`: queries, mutations, status management, project activity
-- `tasks`: queries, commands, status mutation
+Important environment variables:
 
-That split improves explainability without changing the public API.
+- `PORT`
+- `APP_URL`
+- `FRONTEND_URL`
+- `DATABASE_URL`
+- `JWT_ACCESS_SECRET`
+- `JWT_REFRESH_SECRET`
+- `SEED_ENABLED`
+- optional SMTP variables for email delivery
 
-## Folder Scaffold
+## Run Locally
 
-```text
-src/
-|-- common/             bootstrap, filters, interceptors, middleware, utils
-|-- config/             env loading and runtime config validation
-|-- database/           Prisma service and persistence wiring
-`-- modules/
-    |-- auth/           auth controllers, DTOs, guards, services, mappers
-    |-- health/         health check slice
-    |-- mail/           SMTP-backed delivery abstraction
-    |-- project-invites/ invite create, preview, accept
-    |-- projects/       project CRUD, statuses, activity
-    |-- seed/           reviewer/demo bootstrap
-    |-- task-logs/      audit retrieval and write helpers
-    |-- tasks/          task CRUD, status changes, task detail data
-    `-- users/          user-domain support and future expansion
-```
+From `backend/`:
 
-## Implemented API Surface
-
-Main endpoint groups:
-
-- `POST /auth/signup`
-- `POST /auth/login`
-- `POST /auth/refresh`
-- `POST /auth/logout`
-- `GET /auth/me`
-- `POST /auth/verify-email/resend`
-- `POST /auth/verify-email/confirm`
-- `POST /projects`
-- `GET /projects`
-- `GET /projects/:projectId`
-- `PUT /projects/:projectId`
-- `DELETE /projects/:projectId`
-- `POST /projects/:projectId/statuses`
-- `PATCH /projects/:projectId/statuses/:statusId`
-- `POST /projects/:projectId/statuses/reorder`
-- `DELETE /projects/:projectId/statuses/:statusId`
-- `GET /projects/:projectId/activity`
-- `POST /projects/:projectId/invites`
-- `GET /projects/:projectId/tasks`
-- `POST /projects/:projectId/tasks`
-- `GET /tasks/:taskId`
-- `PUT /tasks/:taskId`
-- `PATCH /tasks/:taskId/status`
-- `DELETE /tasks/:taskId`
-- `GET /tasks/:taskId/logs`
-- `GET /tasks/:taskId/comments`
-- `POST /tasks/:taskId/comments`
-- `PATCH /tasks/:taskId/comments/:commentId`
-- `DELETE /tasks/:taskId/comments/:commentId`
-- `GET /tasks/:taskId/attachments`
-- `POST /tasks/:taskId/attachments`
-- `DELETE /tasks/:taskId/attachments/:attachmentId`
-- `GET /invites/:token`
-- `POST /invites/:token/accept`
-- `POST /seed/init`
-
-## Data And Ownership Model
-
-- `projects` owns project identity, members, statuses, and project activity
-- `tasks` owns task records, task detail, comments, attachments, subtasks, and
-  write-side workflow changes
-- `task-logs` owns audit-history persistence and retrieval
-
-This is why the frontend project board workspace composes project and task
-data, while the backend keeps them as separate modules with stable interfaces.
-
-## Environment
-
-The backend loader checks env files in this order:
-
-```text
-.env.<NODE_ENV>.local
-.env.<NODE_ENV>
-.env.local
-.env
-```
-
-Typical local setup:
+1. Copy the env file:
 
 ```bash
 cp .env.example .env
 ```
 
-Common local values:
+2. Start a MySQL database and point `DATABASE_URL` to it.
+   If you are using the full DOWINN workspace, the default local database can
+   be started from the repo root with:
 
-- `PORT=4000`
-- `APP_URL=http://localhost:4000`
-- `FRONTEND_URL=http://localhost:3000`
-- `DATABASE_URL=...`
-- `JWT_ACCESS_SECRET=...`
-- `JWT_REFRESH_SECRET=...`
-- `SMTP_HOST=...`
-- `SMTP_PORT=...`
-- `SMTP_USER=...`
-- `SMTP_PASS=...`
-- `SMTP_FROM=...`
-- `SEED_ENABLED=true` only when reviewer/demo seeding is needed
+```bash
+docker compose --env-file ../infra/.env -f ../infra/docker/docker-compose.yml up -d
+```
+
+3. Install dependencies:
+
+```bash
+pnpm install
+```
+
+4. Apply migrations and generate the Prisma client:
+
+```bash
+pnpm prisma:migrate:deploy
+pnpm prisma:generate
+```
+
+5. Start the backend:
+
+```bash
+pnpm start:dev
+```
+
+## Local Endpoints
+
+- API base: `http://localhost:4000/api/v1`
+- Swagger UI: `http://localhost:4000/api/v1/docs`
+- health: `GET http://localhost:4000/api/v1/health`
+- seed: `POST http://localhost:4000/api/v1/seed/init`
 
 ## Scripts
 
 ```bash
-npm run start:dev
-npm run build
-npm run start:prod
-npm run lint
-npm test
-npm run test:e2e
-npm run prisma:validate
-npm run prisma:generate
-npm run prisma:migrate:dev
-npm run prisma:migrate:deploy
+pnpm start:dev
+pnpm build
+pnpm start:prod
+pnpm lint
+pnpm test
+pnpm test:e2e
+pnpm prisma:validate
+pnpm prisma:generate
+pnpm prisma:migrate:dev
+pnpm prisma:migrate:deploy
 ```
 
 ## Demo Bootstrap
 
-Reviewer path:
+To enable the local reviewer flow:
 
-1. Start the backend locally.
-2. Call `POST /api/v1/seed/init`.
-3. Sign in with:
-   - `demo.member@example.com` / `DemoPass123!`
-   - `demo.admin@example.com` / `DemoPass123!`
+1. Set `SEED_ENABLED=true` in `.env`
+2. Start the backend
+3. Call:
 
-The seed creates two users, two projects, default workflow statuses, demo task
-data, membership records, and ready-to-review activity history.
+```bash
+curl -X POST http://localhost:4000/api/v1/seed/init
+```
+
+Seeded demo accounts:
+
+- `demo.member@example.com` / `DemoPass123!`
+- `demo.admin@example.com` / `DemoPass123!`
 
 ## Verification
 
 ```bash
-npm run lint
-npm test
-npm run test:e2e
-npm run build
+pnpm lint
+pnpm test
+pnpm test:e2e
+pnpm build
 ```
 
-Manual API checks live in:
+## Known Issues / Incomplete Functionality
 
-- `test/README.md`
-- `test/postman/MANUAL-POSTMAN-REST-TESTS.md`
+- Email verification and invite delivery require SMTP configuration. Without
+  valid SMTP settings, those endpoints correctly refuse to send email.
+- This package does not currently expose a dedicated standalone `typecheck`
+  script. Lint, tests, and build are the main verification steps.
 
-For repo-wide verification:
+## Related Notes
 
-```bash
-bash ../scripts/quality-gate.sh
-```
+- [prisma/README.md](./prisma/README.md)
+- [src/README.md](./src/README.md)
+- [test/README.md](./test/README.md)
+- [../README.md](../README.md)
