@@ -81,6 +81,8 @@ export class AuthService {
       try {
         await this.createAndSendVerificationToken(user, signupDto.redirectPath);
       } catch (error) {
+        // Do not leave behind an account that can never finish signup because the
+        // verification mail step failed after the user record was created.
         await this.prismaService.user
           .delete({
             where: {
@@ -136,6 +138,7 @@ export class AuthService {
       throw this.createInvalidCredentialsException();
     }
 
+    // Verification is the boundary between account creation and workspace access.
     if (!user.emailVerifiedAt) {
       throw createForbiddenException({
         message: 'Email verification is required before login',
@@ -186,6 +189,8 @@ export class AuthService {
 
     const nextTokenBundle = await this.issueTokenBundle(user);
 
+    // Rotate refresh tokens on every successful refresh so an older token becomes
+    // useless as soon as the client moves to the new session bundle.
     await this.prismaService.$transaction([
       this.prismaService.refreshToken.update({
         where: {
@@ -273,6 +278,8 @@ export class AuthService {
         },
       });
 
+      // Re-read the user record so deleted or newly unverified accounts cannot keep
+      // using an otherwise valid JWT until it expires.
       if (!user || !user.emailVerifiedAt) {
         throw this.createUnauthenticatedException('Authentication is required');
       }
@@ -312,6 +319,8 @@ export class AuthService {
       });
     }
 
+    // Mark the token as consumed in the same transaction as the user update so the
+    // verification link stays single-use even under retries.
     await this.prismaService.$transaction([
       this.prismaService.user.update({
         where: {
@@ -347,6 +356,8 @@ export class AuthService {
       },
     });
 
+    // Keep the response generic so resend does not reveal whether an address belongs
+    // to a real account or is already verified.
     if (user && !user.emailVerifiedAt) {
       await this.createAndSendVerificationToken(
         user,
@@ -465,6 +476,8 @@ export class AuthService {
     const tokenHash = hashOpaqueToken(rawToken);
     const verificationLink = this.buildVerificationLink(rawToken, redirectPath);
 
+    // Only keep one active verification token per user so the latest email always
+    // represents the canonical path forward.
     await this.prismaService.$transaction([
       this.prismaService.emailVerificationToken.deleteMany({
         where: {

@@ -63,6 +63,8 @@ export class SeedService {
   private async resetSeedOwnedRecords(
     transactionClient: SeedTransactionClient,
   ) {
+    // Only remove records owned by the fixed demo IDs so reruns stay deterministic
+    // without wiping unrelated local data.
     await transactionClient.refreshToken.deleteMany({
       where: {
         userId: {
@@ -188,6 +190,8 @@ export class SeedService {
         name: status.name,
         position: status.position,
         isClosed: status.isClosed,
+        // Seed statuses are explicit so the demo board always opens with the same
+        // lane order regardless of later defaults or migrations.
         createdAt: status.createdAt,
         updatedAt: status.updatedAt,
       })),
@@ -211,6 +215,8 @@ export class SeedService {
   }
 
   private async createSeedLogs(transactionClient: SeedTransactionClient) {
+    // Replay a realistic task history so the reviewer flow has useful activity data
+    // without needing manual edits after seeding.
     const assigneeValue = await this.taskLogsService.getAssigneeLogValue(
       transactionClient,
       DEMO_USERS.member.id,

@@ -43,6 +43,8 @@ export class TaskCommandsService {
     projectId: string,
     createTaskDto: CreateTaskDto,
   ): Promise<TaskResponse> {
+    // Validate cross-record references up front so the transaction only does the
+    // actual create work once the project-scoped inputs are known to be valid.
     await Promise.all([
       this.assertValidAssignee(projectId, createTaskDto.assigneeId),
       this.assertValidParentTask(projectId, createTaskDto.parentTaskId),
@@ -88,6 +90,8 @@ export class TaskCommandsService {
         select: taskResponseSelect,
       });
 
+      // Audit logs are created inside the same transaction so a task cannot appear
+      // without its initial activity entry.
       await this.taskLogsService.createTaskCreatedLog(transactionClient, {
         actorId: currentUser.id,
         actorName: currentUser.name,
@@ -192,6 +196,8 @@ export class TaskCommandsService {
           select: taskResponseSelect,
         });
 
+        // Field-level logs depend on the diff against the pre-update snapshot, so
+        // build the changes before mutating the task record.
         await this.taskLogsService.createTaskUpdatedLogs(transactionClient, {
           actorId: currentUser.id,
           actorName: currentUser.name,
@@ -245,6 +251,7 @@ export class TaskCommandsService {
           select: taskResponseSelect,
         });
 
+        // Reordering within the same lane should not create noisy status-change logs.
         if (existingTask.statusId !== nextStatus.id) {
           await this.taskLogsService.createStatusChangedLog(transactionClient, {
             actorId: currentUser.id,

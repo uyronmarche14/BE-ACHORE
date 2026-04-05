@@ -42,6 +42,8 @@ export class ProjectStatusesService {
             },
           });
 
+          // New statuses always append to the current workflow order so the board
+          // does not reshuffle existing lanes on creation.
           return transaction.projectStatus.create({
             data: {
               projectId,
@@ -160,6 +162,8 @@ export class ProjectStatusesService {
         (statusId) => !requestedStatusIds.includes(statusId),
       )
     ) {
+      // Reorder is all-or-nothing so partial payloads cannot accidentally drop or
+      // duplicate lanes when the board submits a stale list.
       throw createConflictException({
         message:
           'Status reorder payload must include every project status exactly once',
@@ -246,6 +250,8 @@ export class ProjectStatusesService {
     }
 
     await this.prismaService.$transaction(async (transaction) => {
+      // Move tasks first and delete the lane second so project tasks never point at
+      // a status that no longer exists.
       await transaction.task.updateMany({
         where: {
           statusId,

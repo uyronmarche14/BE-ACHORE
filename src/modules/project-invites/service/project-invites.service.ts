@@ -102,6 +102,8 @@ export class ProjectInvitesService {
       });
     }
 
+    // Store only the hash so leaked database rows cannot be turned back into a
+    // usable invite link.
     const rawToken = generateOpaqueToken();
     const tokenHash = hashOpaqueToken(rawToken);
     const expiresAt = new Date(Date.now() + PROJECT_INVITE_TTL_MS);
@@ -130,6 +132,8 @@ export class ProjectInvitesService {
         html: `<p>${escapeHtml(currentUser.name)} invited you to join ${escapeHtml(project.name)}.</p><p>Open the invite link: <a href="${inviteLink.toString()}">${inviteLink.toString()}</a>.</p>`,
       });
     } catch (error) {
+      // Roll back the invite row so the project does not accumulate "sent" invites
+      // that nobody can actually receive.
       await this.prismaService.projectInvite
         .delete({
           where: {
@@ -207,6 +211,8 @@ export class ProjectInvitesService {
       });
     }
 
+    // Accepting the invite is a membership change plus a token state change, so keep
+    // them in one transaction to avoid partially-consumed invites.
     await this.prismaService.$transaction([
       this.prismaService.projectMember.create({
         data: {

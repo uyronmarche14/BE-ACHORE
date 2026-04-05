@@ -49,6 +49,8 @@ export class ResourceAuthorizationService {
       };
     }
 
+    // Owner-only actions intentionally skip membership fallback so shared project
+    // members cannot manage owner-scoped settings.
     if (options.ownerOnly) {
       throw this.createOwnerRequiredException();
     }
@@ -105,6 +107,8 @@ export class ResourceAuthorizationService {
       };
     }
 
+    // Task access inherits project membership rather than task-level ACLs, which
+    // keeps authorization consistent across board, drawer, comments, and files.
     const membership = await this.prismaService.projectMember.findUnique({
       where: {
         projectId_userId: {
