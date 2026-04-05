@@ -46,6 +46,8 @@ describe('ProjectsService', () => {
       createMany: jest.fn(),
       create: jest.fn(),
       findFirst: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
     },
   };
 
@@ -58,6 +60,7 @@ describe('ProjectsService', () => {
     },
     projectStatus: {
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -70,6 +73,7 @@ describe('ProjectsService', () => {
     };
     projectStatus: {
       findFirst: jest.Mock;
+      findMany: jest.Mock;
       create: jest.Mock;
     };
     $transaction: jest.Mock;
@@ -89,11 +93,14 @@ describe('ProjectsService', () => {
     transactionClient.projectStatus.createMany.mockReset();
     transactionClient.projectStatus.create.mockReset();
     transactionClient.projectStatus.findFirst.mockReset();
+    transactionClient.projectStatus.findMany.mockReset();
+    transactionClient.projectStatus.update.mockReset();
     mockPrismaService.project.findMany.mockReset();
     mockPrismaService.project.findUnique.mockReset();
     mockPrismaService.project.update.mockReset();
     mockPrismaService.project.delete.mockReset();
     mockPrismaService.projectStatus.findFirst.mockReset();
+    mockPrismaService.projectStatus.findMany.mockReset();
     mockPrismaService.projectStatus.create.mockReset();
     mockPrismaService.$transaction.mockReset();
     mockPrismaService.$transaction.mockImplementation(
@@ -624,6 +631,114 @@ describe('ProjectsService', () => {
       isClosed: false,
       color: 'BLUE',
       taskCount: 0,
+    });
+  });
+
+  it('reorders project statuses through temporary positions to avoid unique collisions', async () => {
+    mockPrismaService.projectStatus.findMany.mockResolvedValue([
+      { id: 'status-todo' },
+      { id: 'status-progress' },
+      { id: 'status-done' },
+    ]);
+    transactionClient.projectStatus.update.mockResolvedValue(undefined);
+    transactionClient.projectStatus.findMany.mockResolvedValue([
+      createProjectSummaryStatusRecord({
+        id: 'status-progress',
+        name: 'In Progress',
+        position: 1,
+        tasks: [{ id: 'task-1' }],
+      }),
+      createProjectSummaryStatusRecord({
+        id: 'status-done',
+        name: 'Done',
+        position: 2,
+        isClosed: true,
+        tasks: [],
+      }),
+      createProjectSummaryStatusRecord({
+        id: 'status-todo',
+        name: 'Todo',
+        position: 3,
+        tasks: [{ id: 'task-2' }, { id: 'task-3' }],
+      }),
+    ]);
+
+    const result = await projectStatusesService.reorderProjectStatuses(
+      'project-1',
+      {
+        statuses: [
+          { id: 'status-progress' },
+          { id: 'status-done' },
+          { id: 'status-todo' },
+        ],
+      },
+    );
+
+    expect(transactionClient.projectStatus.update.mock.calls).toEqual([
+      [
+        {
+          where: { id: 'status-progress' },
+          data: { position: -1 },
+        },
+      ],
+      [
+        {
+          where: { id: 'status-done' },
+          data: { position: -2 },
+        },
+      ],
+      [
+        {
+          where: { id: 'status-todo' },
+          data: { position: -3 },
+        },
+      ],
+      [
+        {
+          where: { id: 'status-progress' },
+          data: { position: 1 },
+        },
+      ],
+      [
+        {
+          where: { id: 'status-done' },
+          data: { position: 2 },
+        },
+      ],
+      [
+        {
+          where: { id: 'status-todo' },
+          data: { position: 3 },
+        },
+      ],
+    ]);
+    expect(result).toEqual({
+      items: [
+        {
+          id: 'status-progress',
+          name: 'In Progress',
+          position: 1,
+          isClosed: false,
+          color: 'BLUE',
+          taskCount: 1,
+        },
+        {
+          id: 'status-done',
+          name: 'Done',
+          position: 2,
+          isClosed: true,
+          color: 'GREEN',
+          taskCount: 0,
+        },
+        {
+          id: 'status-todo',
+          name: 'Todo',
+          position: 3,
+          isClosed: false,
+          color: 'SLATE',
+          taskCount: 2,
+        },
+      ],
     });
   });
 

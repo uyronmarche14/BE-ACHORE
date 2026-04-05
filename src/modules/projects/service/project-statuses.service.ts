@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { createConflictException } from '../../../common/utils/api-exception.util';
 import { PrismaService } from '../../../database/prisma.service';
 import type { CreateProjectStatusDto } from '../dto/create-project-status.dto';
@@ -9,6 +10,7 @@ import type {
   DeleteProjectResponse,
   ProjectStatusListResponse,
   ProjectStatusSummaryResponse,
+  ProjectSummaryStatusRecord,
 } from '../types/project-response.type';
 import {
   createProjectNotFoundException,
@@ -112,10 +114,7 @@ export class ProjectStatusesService {
         select: projectStatusSummarySelect,
       });
 
-      return {
-        ...updatedStatus,
-        taskCount: updatedStatus.tasks.length,
-      };
+      return this.toProjectStatusSummaryResponse(updatedStatus);
     } catch (error) {
       if (isPrismaUniqueConstraintError(error)) {
         throw createConflictException({
@@ -172,18 +171,7 @@ export class ProjectStatusesService {
 
     const reorderedStatuses = await this.prismaService.$transaction(
       async (transaction) => {
-        await Promise.all(
-          requestedStatusIds.map((statusId: string, index: number) =>
-            transaction.projectStatus.update({
-              where: {
-                id: statusId,
-              },
-              data: {
-                position: index + 1,
-              },
-            }),
-          ),
-        );
+        await this.resequenceProjectStatuses(transaction, requestedStatusIds);
 
         return transaction.projectStatus.findMany({
           where: {
@@ -198,10 +186,9 @@ export class ProjectStatusesService {
     );
 
     return {
-      items: reorderedStatuses.map((status) => ({
-        ...status,
-        taskCount: status.tasks.length,
-      })),
+      items: reorderedStatuses.map((status) =>
+        this.toProjectStatusSummaryResponse(status),
+      ),
     };
   }
 
@@ -279,17 +266,9 @@ export class ProjectStatusesService {
         },
       });
 
-      await Promise.all(
-        remainingStatuses.map((status, index) =>
-          transaction.projectStatus.update({
-            where: {
-              id: status.id,
-            },
-            data: {
-              position: index + 1,
-            },
-          }),
-        ),
+      await this.resequenceProjectStatuses(
+        transaction,
+        remainingStatuses.map((status) => status.id),
       );
     });
 
@@ -327,5 +306,45 @@ export class ProjectStatusesService {
     if (!status) {
       throw createProjectNotFoundException();
     }
+  }
+
+  private async resequenceProjectStatuses(
+    transaction: Prisma.TransactionClient,
+    statusIds: string[],
+  ) {
+    for (const [index, statusId] of statusIds.entries()) {
+      await transaction.projectStatus.update({
+        where: {
+          id: statusId,
+        },
+        data: {
+          position: -(index + 1),
+        },
+      });
+    }
+
+    for (const [index, statusId] of statusIds.entries()) {
+      await transaction.projectStatus.update({
+        where: {
+          id: statusId,
+        },
+        data: {
+          position: index + 1,
+        },
+      });
+    }
+  }
+
+  private toProjectStatusSummaryResponse(
+    status: ProjectSummaryStatusRecord,
+  ): ProjectStatusSummaryResponse {
+    return {
+      id: status.id,
+      name: status.name,
+      position: status.position,
+      isClosed: status.isClosed,
+      color: status.color,
+      taskCount: status.tasks.length,
+    };
   }
 }
