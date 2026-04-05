@@ -23,6 +23,12 @@ describe('ProjectsController (e2e)', () => {
   let jwtAuthGuard: JwtAuthGuard;
   let resourceAccessGuard: ResourceAccessGuard;
 
+  const mockProjectsService = {
+    getProjectDetail: jest.fn(),
+    updateProject: jest.fn(),
+    deleteProject: jest.fn(),
+  };
+
   const mockAuthService = {
     authenticateAccessToken: jest.fn(),
   };
@@ -60,6 +66,9 @@ describe('ProjectsController (e2e)', () => {
     mockPrismaService.project.delete.mockReset();
     mockPrismaService.projectMember.findUnique.mockReset();
     mockPrismaService.$transaction.mockReset();
+    mockProjectsService.getProjectDetail.mockReset();
+    mockProjectsService.updateProject.mockReset();
+    mockProjectsService.deleteProject.mockReset();
     mockPrismaService.$transaction.mockImplementation(
       async (
         callback: (client: typeof transactionClient) => Promise<unknown>,
@@ -102,10 +111,13 @@ describe('ProjectsController (e2e)', () => {
       controllers: [ProjectsController],
       providers: [
         Reflector,
-        ProjectsService,
         JwtAuthGuard,
         ResourceAccessGuard,
         ResourceAuthorizationService,
+        {
+          provide: ProjectsService,
+          useValue: mockProjectsService,
+        },
         {
           provide: AuthService,
           useValue: mockAuthService,
@@ -127,7 +139,7 @@ describe('ProjectsController (e2e)', () => {
   });
 
   afterEach(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('returns a normalized 404 envelope when a guarded project does not exist', async () => {
@@ -225,12 +237,12 @@ describe('ProjectsController (e2e)', () => {
       id: 'project-1',
       ownerId: 'owner-1',
     });
-    mockPrismaService.project.update.mockResolvedValue({
+    mockProjectsService.updateProject.mockResolvedValue({
       id: 'project-1',
       name: 'Launch Website',
       description: null,
-      ownerId: 'owner-1',
-      tasks: [],
+      role: 'OWNER',
+      statuses: [],
     });
 
     await expect(
@@ -254,11 +266,7 @@ describe('ProjectsController (e2e)', () => {
       name: 'Launch Website',
       description: null,
       role: 'OWNER',
-      taskCounts: {
-        TODO: 0,
-        IN_PROGRESS: 0,
-        DONE: 0,
-      },
+      statuses: [],
     });
   });
 
@@ -267,8 +275,8 @@ describe('ProjectsController (e2e)', () => {
       id: 'project-1',
       ownerId: 'owner-1',
     });
-    mockPrismaService.project.delete.mockResolvedValue({
-      id: 'project-1',
+    mockProjectsService.deleteProject.mockResolvedValue({
+      message: 'Project deleted successfully',
     });
 
     await expect(

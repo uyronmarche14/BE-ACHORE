@@ -3,7 +3,7 @@ import {
   type ExecutionContext,
   type INestApplication,
 } from '@nestjs/common';
-import { TaskLogEventType, TaskStatus } from '@prisma/client';
+import { TaskLogEventType } from '@prisma/client';
 import { Reflector } from '@nestjs/core';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { GlobalExceptionFilter } from '../src/common/filters/global-exception.filter';
@@ -17,6 +17,8 @@ import type { AuthenticatedRequest } from '../src/modules/auth/types/authenticat
 import { TaskLogsController } from '../src/modules/task-logs/controller/task-logs.controller';
 import { TaskLogsService } from '../src/modules/task-logs/service/task-logs.service';
 import { TasksController } from '../src/modules/tasks/controller/tasks.controller';
+import { TaskAttachmentsService } from '../src/modules/tasks/service/task-attachments.service';
+import { TaskCommentsService } from '../src/modules/tasks/service/task-comments.service';
 import { CreateTaskDto } from '../src/modules/tasks/dto/create-task.dto';
 import { UpdateTaskDto } from '../src/modules/tasks/dto/update-task.dto';
 import { UpdateTaskStatusDto } from '../src/modules/tasks/dto/update-task-status.dto';
@@ -28,6 +30,23 @@ describe('TaskLogsController (e2e)', () => {
   let tasksController: TasksController;
   let jwtAuthGuard: JwtAuthGuard;
   let resourceAccessGuard: ResourceAccessGuard;
+
+  const mockTasksService = {
+    createTask: jest.fn(),
+    updateTask: jest.fn(),
+    updateTaskStatus: jest.fn(),
+  };
+  const mockTaskCommentsService = {
+    listTaskComments: jest.fn(),
+    createTaskComment: jest.fn(),
+    updateTaskComment: jest.fn(),
+    deleteTaskComment: jest.fn(),
+  };
+  const mockTaskAttachmentsService = {
+    listTaskAttachments: jest.fn(),
+    createTaskAttachment: jest.fn(),
+    deleteTaskAttachment: jest.fn(),
+  };
 
   let taskLogsState: Array<{
     id: string;
@@ -48,7 +67,8 @@ describe('TaskLogsController (e2e)', () => {
       projectId: string;
       title: string;
       description: string | null;
-      status: TaskStatus;
+      statusId: string;
+      statusName: string;
       position: number | null;
       assigneeId: string | null;
       dueDate: Date | null;
@@ -101,7 +121,8 @@ describe('TaskLogsController (e2e)', () => {
         projectId: 'project-1',
         title: 'Draft API envelope',
         description: null,
-        status: TaskStatus.TODO,
+        statusId: 'status-todo',
+        statusName: 'Todo',
         position: null,
         assigneeId: null,
         dueDate: null,
@@ -152,6 +173,9 @@ describe('TaskLogsController (e2e)', () => {
       },
     );
 
+    mockTasksService.createTask.mockReset();
+    mockTasksService.updateTask.mockReset();
+    mockTasksService.updateTaskStatus.mockReset();
     mockPrismaService.$transaction.mockImplementation(
       async (
         callback: (
@@ -191,88 +215,6 @@ describe('TaskLogsController (e2e)', () => {
             ownerId: 'owner-1',
           },
         };
-      },
-    );
-    mockPrismaService.task.create.mockImplementation(
-      ({
-        data,
-      }: {
-        data: {
-          projectId: string;
-          title: string;
-          description: string | null;
-          status: TaskStatus;
-          assigneeId: string | null;
-          dueDate: Date | null;
-          createdById: string;
-        };
-      }) => {
-        const createdTask = {
-          id: 'task-2',
-          projectId: data.projectId,
-          title: data.title,
-          description: data.description,
-          status: data.status,
-          position: null,
-          assigneeId: data.assigneeId,
-          dueDate: data.dueDate,
-          createdAt: new Date('2026-04-02T09:00:00.000Z'),
-          updatedAt: new Date('2026-04-02T09:00:00.000Z'),
-        };
-
-        taskState[createdTask.id] = createdTask;
-
-        return createdTask;
-      },
-    );
-    mockPrismaService.task.update.mockImplementation(
-      ({
-        where,
-        data,
-      }: {
-        where: { id: string };
-        data: Record<string, unknown>;
-      }) => {
-        const existingTask = taskState[where.id];
-
-        if (!existingTask) {
-          const prismaError = new Error('Task not found');
-          (
-            prismaError as Error & {
-              code: string;
-            }
-          ).code = 'P2025';
-          throw prismaError;
-        }
-
-        const updatedTask = {
-          ...existingTask,
-          ...(data.title !== undefined ? { title: data.title as string } : {}),
-          ...(data.description !== undefined
-            ? { description: data.description as string | null }
-            : {}),
-          ...(data.assigneeId !== undefined
-            ? { assigneeId: data.assigneeId as string | null }
-            : {}),
-          ...(data.dueDate !== undefined
-            ? { dueDate: data.dueDate as Date | null }
-            : {}),
-          ...(data.status !== undefined
-            ? { status: data.status as TaskStatus }
-            : {}),
-          ...(data.position !== undefined
-            ? { position: data.position as number | null }
-            : {}),
-          updatedAt: new Date(
-            data.status !== undefined
-              ? '2026-04-04T09:00:00.000Z'
-              : '2026-04-03T09:00:00.000Z',
-          ),
-        };
-
-        taskState[where.id] = updatedTask;
-
-        return updatedTask;
       },
     );
     mockPrismaService.taskLog.create.mockImplementation(
@@ -322,15 +264,237 @@ describe('TaskLogsController (e2e)', () => {
           })),
     );
 
+    mockTasksService.createTask.mockImplementation(
+      (_currentUser, projectId: string, createTaskDto: CreateTaskDto) => {
+        const createdTask = {
+          id: 'task-2',
+          projectId,
+          title: createTaskDto.title,
+          description: createTaskDto.description ?? null,
+          statusId: createTaskDto.statusId ?? 'status-todo',
+          statusName: 'Todo',
+          position: null,
+          assigneeId: createTaskDto.assigneeId ?? null,
+          dueDate: createTaskDto.dueDate
+            ? new Date(createTaskDto.dueDate)
+            : null,
+          createdAt: new Date('2026-04-02T09:00:00.000Z'),
+          updatedAt: new Date('2026-04-02T09:00:00.000Z'),
+        };
+
+        taskState[createdTask.id] = createdTask;
+        taskLogsState = [
+          ...taskLogsState,
+          {
+            id: `log-${taskLogsState.length + 1}`,
+            taskId: createdTask.id,
+            actorId: 'member-1',
+            eventType: TaskLogEventType.TASK_CREATED,
+            fieldName: null,
+            oldValue: null,
+            newValue: createdTask.title,
+            summary: 'Task created',
+            createdAt: new Date('2026-04-02T09:00:00.000Z'),
+          },
+        ];
+
+        return Promise.resolve({
+          id: createdTask.id,
+          projectId: createdTask.projectId,
+          title: createdTask.title,
+          description: createdTask.description,
+          acceptanceCriteria: null,
+          notes: null,
+          parentTaskId: null,
+          statusId: createdTask.statusId,
+          status: {
+            id: createdTask.statusId,
+            name: createdTask.statusName,
+            position: 1,
+            isClosed: false,
+            color: 'SLATE',
+          },
+          position: createdTask.position,
+          assigneeId: createdTask.assigneeId,
+          dueDate: createdTask.dueDate
+            ? createdTask.dueDate.toISOString().slice(0, 10)
+            : null,
+          links: [],
+          checklistItems: [],
+          subtasks: [],
+          createdAt: createdTask.createdAt.toISOString(),
+          updatedAt: createdTask.updatedAt.toISOString(),
+        });
+      },
+    );
+    mockTasksService.updateTask.mockImplementation(
+      (_currentUser, taskId: string, updateTaskDto: UpdateTaskDto) => {
+        const existingTask = taskState[taskId];
+
+        if (!existingTask) {
+          throw new Error('Task not found');
+        }
+
+        if (
+          updateTaskDto.title !== undefined &&
+          updateTaskDto.title !== existingTask.title
+        ) {
+          taskLogsState = [
+            ...taskLogsState,
+            {
+              id: `log-${taskLogsState.length + 1}`,
+              taskId,
+              actorId: 'member-1',
+              eventType: TaskLogEventType.TASK_UPDATED,
+              fieldName: 'title',
+              oldValue: existingTask.title,
+              newValue: updateTaskDto.title,
+              summary: 'Title updated',
+              createdAt: new Date('2026-04-03T09:00:00.000Z'),
+            },
+          ];
+          existingTask.title = updateTaskDto.title;
+        }
+
+        if (updateTaskDto.dueDate !== undefined) {
+          const nextDueDate = updateTaskDto.dueDate
+            ? new Date(updateTaskDto.dueDate)
+            : null;
+          taskLogsState = [
+            ...taskLogsState,
+            {
+              id: `log-${taskLogsState.length + 1}`,
+              taskId,
+              actorId: 'member-1',
+              eventType: TaskLogEventType.TASK_UPDATED,
+              fieldName: 'dueDate',
+              oldValue: existingTask.dueDate
+                ? existingTask.dueDate.toISOString().slice(0, 10)
+                : null,
+              newValue: nextDueDate
+                ? nextDueDate.toISOString().slice(0, 10)
+                : null,
+              summary: 'Due date updated',
+              createdAt: new Date('2026-04-03T09:05:00.000Z'),
+            },
+          ];
+          existingTask.dueDate = nextDueDate;
+        }
+
+        existingTask.updatedAt = new Date('2026-04-03T09:05:00.000Z');
+
+        return Promise.resolve({
+          id: existingTask.id,
+          projectId: existingTask.projectId,
+          title: existingTask.title,
+          description: existingTask.description,
+          acceptanceCriteria: null,
+          notes: null,
+          parentTaskId: null,
+          statusId: existingTask.statusId,
+          status: {
+            id: existingTask.statusId,
+            name: existingTask.statusName,
+            position: existingTask.statusId === 'status-done' ? 3 : 1,
+            isClosed: existingTask.statusId === 'status-done',
+            color: existingTask.statusId === 'status-done' ? 'GREEN' : 'SLATE',
+          },
+          position: existingTask.position,
+          assigneeId: existingTask.assigneeId,
+          dueDate: existingTask.dueDate
+            ? existingTask.dueDate.toISOString().slice(0, 10)
+            : null,
+          links: [],
+          checklistItems: [],
+          subtasks: [],
+          createdAt: existingTask.createdAt.toISOString(),
+          updatedAt: existingTask.updatedAt.toISOString(),
+        });
+      },
+    );
+    mockTasksService.updateTaskStatus.mockImplementation(
+      (
+        _currentUser,
+        taskId: string,
+        updateTaskStatusDto: UpdateTaskStatusDto,
+      ) => {
+        const existingTask = taskState[taskId];
+
+        if (!existingTask) {
+          throw new Error('Task not found');
+        }
+
+        const previousStatusName = existingTask.statusName;
+        existingTask.statusId = updateTaskStatusDto.statusId;
+        existingTask.statusName =
+          updateTaskStatusDto.statusId === 'status-done' ? 'Done' : 'Todo';
+        existingTask.updatedAt = new Date('2026-04-04T09:00:00.000Z');
+
+        taskLogsState = [
+          ...taskLogsState,
+          {
+            id: `log-${taskLogsState.length + 1}`,
+            taskId,
+            actorId: 'member-1',
+            eventType: TaskLogEventType.STATUS_CHANGED,
+            fieldName: 'status',
+            oldValue: previousStatusName,
+            newValue: existingTask.statusName,
+            summary: 'Status changed',
+            createdAt: new Date('2026-04-04T09:00:00.000Z'),
+          },
+        ];
+
+        return Promise.resolve({
+          id: existingTask.id,
+          projectId: existingTask.projectId,
+          title: existingTask.title,
+          description: existingTask.description,
+          acceptanceCriteria: null,
+          notes: null,
+          parentTaskId: null,
+          statusId: existingTask.statusId,
+          status: {
+            id: existingTask.statusId,
+            name: existingTask.statusName,
+            position: existingTask.statusId === 'status-done' ? 3 : 1,
+            isClosed: existingTask.statusId === 'status-done',
+            color: existingTask.statusId === 'status-done' ? 'GREEN' : 'SLATE',
+          },
+          position: existingTask.position,
+          assigneeId: existingTask.assigneeId,
+          dueDate: existingTask.dueDate
+            ? existingTask.dueDate.toISOString().slice(0, 10)
+            : null,
+          links: [],
+          checklistItems: [],
+          subtasks: [],
+          createdAt: existingTask.createdAt.toISOString(),
+          updatedAt: existingTask.updatedAt.toISOString(),
+        });
+      },
+    );
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [TasksController, TaskLogsController],
       providers: [
         Reflector,
-        TasksService,
         TaskLogsService,
         JwtAuthGuard,
         ResourceAccessGuard,
         ResourceAuthorizationService,
+        {
+          provide: TasksService,
+          useValue: mockTasksService,
+        },
+        {
+          provide: TaskCommentsService,
+          useValue: mockTaskCommentsService,
+        },
+        {
+          provide: TaskAttachmentsService,
+          useValue: mockTaskAttachmentsService,
+        },
         {
           provide: AuthService,
           useValue: mockAuthService,
@@ -353,7 +517,7 @@ describe('TaskLogsController (e2e)', () => {
   });
 
   afterEach(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('returns 401 for unauthenticated task-log requests', async () => {
@@ -501,7 +665,7 @@ describe('TaskLogsController (e2e)', () => {
         },
       }),
       body: {
-        status: TaskStatus.DONE,
+        statusId: 'status-done',
         position: null,
       },
     });
@@ -562,7 +726,7 @@ async function executeTaskRoute({
     description?: string | null;
     assigneeId?: string | null;
     dueDate?: string | null;
-    status?: TaskStatus;
+    statusId?: string;
     position?: number | null;
   };
 }) {

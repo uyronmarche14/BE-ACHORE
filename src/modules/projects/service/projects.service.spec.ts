@@ -3,6 +3,10 @@
 import { NotFoundException } from '@nestjs/common';
 import { ProjectMemberRole } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import { ProjectActivityService } from './project-activity.service';
+import { ProjectMutationsService } from './project-mutations.service';
+import { ProjectQueriesService } from './project-queries.service';
+import { ProjectStatusesService } from './project-statuses.service';
 import { ProjectsService } from './projects.service';
 
 describe('ProjectsService', () => {
@@ -72,6 +76,10 @@ describe('ProjectsService', () => {
   };
 
   let projectsService: ProjectsService;
+  let projectQueriesService: ProjectQueriesService;
+  let projectMutationsService: ProjectMutationsService;
+  let projectStatusesService: ProjectStatusesService;
+  let projectActivityService: ProjectActivityService;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -94,7 +102,16 @@ describe('ProjectsService', () => {
       ) => callback(transactionClient),
     );
 
-    projectsService = new ProjectsService(mockPrismaService);
+    projectQueriesService = new ProjectQueriesService(mockPrismaService);
+    projectMutationsService = new ProjectMutationsService(mockPrismaService);
+    projectStatusesService = new ProjectStatusesService(mockPrismaService);
+    projectActivityService = new ProjectActivityService(mockPrismaService);
+    projectsService = new ProjectsService(
+      projectQueriesService,
+      projectMutationsService,
+      projectStatusesService,
+      projectActivityService,
+    );
   });
 
   it('creates a project and owner membership in one transaction', async () => {

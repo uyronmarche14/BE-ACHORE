@@ -3,7 +3,6 @@ import {
   type ExecutionContext,
   type INestApplication,
 } from '@nestjs/common';
-import { TaskStatus } from '@prisma/client';
 import { Reflector } from '@nestjs/core';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { GlobalExceptionFilter } from '../src/common/filters/global-exception.filter';
@@ -14,9 +13,10 @@ import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { ResourceAccessGuard } from '../src/modules/auth/guards/resource-access.guard';
 import { AuthService } from '../src/modules/auth/service/auth.service';
 import { ResourceAuthorizationService } from '../src/modules/auth/service/resource-authorization.service';
-import { TaskLogsService } from '../src/modules/task-logs/service/task-logs.service';
 import type { AuthenticatedRequest } from '../src/modules/auth/types/authenticated-request.type';
 import { TasksController } from '../src/modules/tasks/controller/tasks.controller';
+import { TaskAttachmentsService } from '../src/modules/tasks/service/task-attachments.service';
+import { TaskCommentsService } from '../src/modules/tasks/service/task-comments.service';
 import { CreateTaskDto } from '../src/modules/tasks/dto/create-task.dto';
 import { UpdateTaskDto } from '../src/modules/tasks/dto/update-task.dto';
 import { UpdateTaskStatusDto } from '../src/modules/tasks/dto/update-task-status.dto';
@@ -27,6 +27,26 @@ describe('TasksController (e2e)', () => {
   let controller: TasksController;
   let jwtAuthGuard: JwtAuthGuard;
   let resourceAccessGuard: ResourceAccessGuard;
+
+  const mockTasksService = {
+    listProjectTasks: jest.fn(),
+    createTask: jest.fn(),
+    getTask: jest.fn(),
+    updateTask: jest.fn(),
+    updateTaskStatus: jest.fn(),
+    deleteTask: jest.fn(),
+  };
+  const mockTaskCommentsService = {
+    listTaskComments: jest.fn(),
+    createTaskComment: jest.fn(),
+    updateTaskComment: jest.fn(),
+    deleteTaskComment: jest.fn(),
+  };
+  const mockTaskAttachmentsService = {
+    listTaskAttachments: jest.fn(),
+    createTaskAttachment: jest.fn(),
+    deleteTaskAttachment: jest.fn(),
+  };
 
   const mockAuthService = {
     authenticateAccessToken: jest.fn(),
@@ -69,6 +89,12 @@ describe('TasksController (e2e)', () => {
     mockPrismaService.taskLog.create.mockReset();
     mockPrismaService.taskLog.findMany.mockReset();
     mockPrismaService.user.findUnique.mockReset();
+    mockTasksService.listProjectTasks.mockReset();
+    mockTasksService.createTask.mockReset();
+    mockTasksService.getTask.mockReset();
+    mockTasksService.updateTask.mockReset();
+    mockTasksService.updateTaskStatus.mockReset();
+    mockTasksService.deleteTask.mockReset();
     mockPrismaService.$transaction.mockImplementation(
       async (
         callback: (
@@ -123,11 +149,21 @@ describe('TasksController (e2e)', () => {
       controllers: [TasksController],
       providers: [
         Reflector,
-        TasksService,
         JwtAuthGuard,
         ResourceAccessGuard,
         ResourceAuthorizationService,
-        TaskLogsService,
+        {
+          provide: TasksService,
+          useValue: mockTasksService,
+        },
+        {
+          provide: TaskCommentsService,
+          useValue: mockTaskCommentsService,
+        },
+        {
+          provide: TaskAttachmentsService,
+          useValue: mockTaskAttachmentsService,
+        },
         {
           provide: AuthService,
           useValue: mockAuthService,
@@ -149,7 +185,7 @@ describe('TasksController (e2e)', () => {
   });
 
   afterEach(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('returns 401 for unauthenticated task requests', async () => {
@@ -249,32 +285,86 @@ describe('TasksController (e2e)', () => {
     mockPrismaService.projectMember.findUnique.mockResolvedValue({
       id: 'membership-1',
     });
-    mockPrismaService.task.findMany.mockResolvedValue([
-      {
-        id: 'task-done',
-        projectId: 'project-1',
-        title: 'Publish smoke notes',
-        description: null,
-        status: TaskStatus.DONE,
-        position: null,
-        assigneeId: null,
-        dueDate: null,
-        createdAt: new Date('2026-04-02T09:00:00.000Z'),
-        updatedAt: new Date('2026-04-02T09:00:00.000Z'),
-      },
-      {
-        id: 'task-todo',
-        projectId: 'project-1',
-        title: 'Draft API envelope',
-        description: null,
-        status: TaskStatus.TODO,
-        position: 1,
-        assigneeId: null,
-        dueDate: null,
-        createdAt: new Date('2026-04-01T09:00:00.000Z'),
-        updatedAt: new Date('2026-04-01T09:00:00.000Z'),
-      },
-    ]);
+    mockTasksService.listProjectTasks.mockResolvedValue({
+      statuses: [
+        {
+          id: 'status-todo',
+          name: 'Todo',
+          position: 1,
+          isClosed: false,
+          color: 'SLATE',
+          tasks: [
+            {
+              id: 'task-todo',
+              projectId: 'project-1',
+              title: 'Draft API envelope',
+              description: null,
+              acceptanceCriteria: null,
+              notes: null,
+              parentTaskId: null,
+              statusId: 'status-todo',
+              status: {
+                id: 'status-todo',
+                name: 'Todo',
+                position: 1,
+                isClosed: false,
+                color: 'SLATE',
+              },
+              position: 1,
+              assigneeId: null,
+              dueDate: null,
+              links: [],
+              checklistItems: [],
+              subtasks: [],
+              createdAt: '2026-04-01T09:00:00.000Z',
+              updatedAt: '2026-04-01T09:00:00.000Z',
+            },
+          ],
+        },
+        {
+          id: 'status-in-progress',
+          name: 'In Progress',
+          position: 2,
+          isClosed: false,
+          color: 'BLUE',
+          tasks: [],
+        },
+        {
+          id: 'status-done',
+          name: 'Done',
+          position: 3,
+          isClosed: true,
+          color: 'GREEN',
+          tasks: [
+            {
+              id: 'task-done',
+              projectId: 'project-1',
+              title: 'Publish smoke notes',
+              description: null,
+              acceptanceCriteria: null,
+              notes: null,
+              parentTaskId: null,
+              statusId: 'status-done',
+              status: {
+                id: 'status-done',
+                name: 'Done',
+                position: 3,
+                isClosed: true,
+                color: 'GREEN',
+              },
+              position: null,
+              assigneeId: null,
+              dueDate: null,
+              links: [],
+              checklistItems: [],
+              subtasks: [],
+              createdAt: '2026-04-02T09:00:00.000Z',
+              updatedAt: '2026-04-02T09:00:00.000Z',
+            },
+          ],
+        },
+      ],
+    });
 
     await expect(
       executeTaskRoute({
@@ -289,38 +379,21 @@ describe('TasksController (e2e)', () => {
           },
         }),
       }),
-    ).resolves.toEqual({
-      taskGroups: {
-        TODO: [
-          {
-            id: 'task-todo',
-            projectId: 'project-1',
-            title: 'Draft API envelope',
-            description: null,
-            status: TaskStatus.TODO,
-            position: 1,
-            assigneeId: null,
-            dueDate: null,
-            createdAt: '2026-04-01T09:00:00.000Z',
-            updatedAt: '2026-04-01T09:00:00.000Z',
-          },
-        ],
-        IN_PROGRESS: [],
-        DONE: [
-          {
-            id: 'task-done',
-            projectId: 'project-1',
-            title: 'Publish smoke notes',
-            description: null,
-            status: TaskStatus.DONE,
-            position: null,
-            assigneeId: null,
-            dueDate: null,
-            createdAt: '2026-04-02T09:00:00.000Z',
-            updatedAt: '2026-04-02T09:00:00.000Z',
-          },
-        ],
-      },
+    ).resolves.toMatchObject({
+      statuses: [
+        {
+          id: 'status-todo',
+          name: 'Todo',
+        },
+        {
+          id: 'status-in-progress',
+          name: 'In Progress',
+        },
+        {
+          id: 'status-done',
+          name: 'Done',
+        },
+      ],
     });
   });
 
@@ -413,21 +486,30 @@ describe('TasksController (e2e)', () => {
       .mockResolvedValueOnce({
         id: 'membership-1',
       });
-    mockPrismaService.user.findUnique.mockResolvedValue({
-      id: 'member-1',
-      name: 'Member User',
-    });
-    mockPrismaService.task.create.mockResolvedValue({
+    mockTasksService.createTask.mockResolvedValue({
       id: 'task-1',
       projectId: 'project-1',
       title: 'Ship launch checklist',
       description: null,
-      status: TaskStatus.TODO,
+      acceptanceCriteria: null,
+      notes: null,
+      parentTaskId: null,
+      statusId: 'status-todo',
+      status: {
+        id: 'status-todo',
+        name: 'Todo',
+        position: 1,
+        isClosed: false,
+        color: 'SLATE',
+      },
       position: null,
       assigneeId: null,
       dueDate: null,
-      createdAt: new Date('2026-04-01T09:00:00.000Z'),
-      updatedAt: new Date('2026-04-01T09:00:00.000Z'),
+      links: [],
+      checklistItems: [],
+      subtasks: [],
+      createdAt: '2026-04-01T09:00:00.000Z',
+      updatedAt: '2026-04-01T09:00:00.000Z',
     });
     mockPrismaService.task.findUnique
       .mockResolvedValueOnce({
@@ -438,29 +520,39 @@ describe('TasksController (e2e)', () => {
         },
       })
       .mockResolvedValueOnce({
-        projectId: 'project-1',
-      })
-      .mockResolvedValueOnce({
         id: 'task-1',
         projectId: 'project-1',
         project: {
           ownerId: 'owner-1',
         },
       });
-    mockPrismaService.task.update.mockResolvedValue({
+    mockTasksService.updateTask.mockResolvedValue({
       id: 'task-1',
       projectId: 'project-1',
       title: 'Review release notes',
       description: null,
-      status: TaskStatus.TODO,
+      acceptanceCriteria: null,
+      notes: null,
+      parentTaskId: null,
+      statusId: 'status-todo',
+      status: {
+        id: 'status-todo',
+        name: 'Todo',
+        position: 1,
+        isClosed: false,
+        color: 'SLATE',
+      },
       position: null,
       assigneeId: 'member-1',
       dueDate: null,
-      createdAt: new Date('2026-04-01T09:00:00.000Z'),
-      updatedAt: new Date('2026-04-02T11:00:00.000Z'),
+      links: [],
+      checklistItems: [],
+      subtasks: [],
+      createdAt: '2026-04-01T09:00:00.000Z',
+      updatedAt: '2026-04-02T11:00:00.000Z',
     });
-    mockPrismaService.task.delete.mockResolvedValue({
-      id: 'task-1',
+    mockTasksService.deleteTask.mockResolvedValue({
+      message: 'Task deleted successfully',
     });
 
     await expect(
@@ -483,7 +575,7 @@ describe('TasksController (e2e)', () => {
       id: 'task-1',
       projectId: 'project-1',
       title: 'Ship launch checklist',
-      status: TaskStatus.TODO,
+      statusId: 'status-todo',
     });
 
     await expect(
@@ -539,17 +631,30 @@ describe('TasksController (e2e)', () => {
     mockPrismaService.projectMember.findUnique.mockResolvedValue({
       id: 'membership-1',
     });
-    mockPrismaService.task.update.mockResolvedValue({
+    mockTasksService.updateTaskStatus.mockResolvedValue({
       id: 'task-1',
       projectId: 'project-1',
       title: 'Ship launch checklist',
       description: null,
-      status: TaskStatus.DONE,
+      acceptanceCriteria: null,
+      notes: null,
+      parentTaskId: null,
+      statusId: 'status-done',
+      status: {
+        id: 'status-done',
+        name: 'Done',
+        position: 3,
+        isClosed: true,
+        color: 'GREEN',
+      },
       position: null,
       assigneeId: null,
       dueDate: null,
-      createdAt: new Date('2026-04-01T09:00:00.000Z'),
-      updatedAt: new Date('2026-04-06T09:00:00.000Z'),
+      links: [],
+      checklistItems: [],
+      subtasks: [],
+      createdAt: '2026-04-01T09:00:00.000Z',
+      updatedAt: '2026-04-06T09:00:00.000Z',
     });
 
     await expect(
@@ -565,14 +670,14 @@ describe('TasksController (e2e)', () => {
           },
         }),
         body: {
-          status: TaskStatus.DONE,
+          statusId: 'status-done',
           position: null,
         },
       }),
     ).resolves.toMatchObject({
       id: 'task-1',
       projectId: 'project-1',
-      status: TaskStatus.DONE,
+      statusId: 'status-done',
       position: null,
     });
   });
@@ -582,20 +687,44 @@ describe('TasksController (e2e)', () => {
       id: 'project-1',
       ownerId: 'owner-1',
     });
-    mockPrismaService.task.findMany.mockResolvedValue([
-      {
-        id: 'task-1',
-        projectId: 'project-1',
-        title: 'Ship launch checklist',
-        description: null,
-        status: TaskStatus.TODO,
-        position: null,
-        assigneeId: null,
-        dueDate: null,
-        createdAt: new Date('2026-04-01T09:00:00.000Z'),
-        updatedAt: new Date('2026-04-01T09:00:00.000Z'),
-      },
-    ]);
+    mockTasksService.listProjectTasks.mockResolvedValue({
+      statuses: [
+        {
+          id: 'status-todo',
+          name: 'Todo',
+          position: 1,
+          isClosed: false,
+          color: 'SLATE',
+          tasks: [
+            {
+              id: 'task-1',
+              projectId: 'project-1',
+              title: 'Ship launch checklist',
+              description: null,
+              acceptanceCriteria: null,
+              notes: null,
+              parentTaskId: null,
+              statusId: 'status-todo',
+              status: {
+                id: 'status-todo',
+                name: 'Todo',
+                position: 1,
+                isClosed: false,
+                color: 'SLATE',
+              },
+              position: null,
+              assigneeId: null,
+              dueDate: null,
+              links: [],
+              checklistItems: [],
+              subtasks: [],
+              createdAt: '2026-04-01T09:00:00.000Z',
+              updatedAt: '2026-04-01T09:00:00.000Z',
+            },
+          ],
+        },
+      ],
+    });
 
     await expect(
       executeTaskRoute({
@@ -611,43 +740,54 @@ describe('TasksController (e2e)', () => {
         }),
       }),
     ).resolves.toMatchObject({
-      taskGroups: {
-        TODO: [
-          {
-            id: 'task-1',
-            projectId: 'project-1',
-            title: 'Ship launch checklist',
-          },
-        ],
-        IN_PROGRESS: [],
-        DONE: [],
-      },
+      statuses: [
+        {
+          id: 'status-todo',
+          tasks: [
+            {
+              id: 'task-1',
+            },
+          ],
+        },
+      ],
     });
 
     expect(mockPrismaService.projectMember.findUnique).not.toHaveBeenCalled();
   });
 
   it('allows admins to bypass project membership when loading a single task', async () => {
-    mockPrismaService.task.findUnique
-      .mockResolvedValueOnce({
-        id: 'task-1',
-        projectId: 'project-1',
-        project: {
-          ownerId: 'owner-1',
-        },
-      })
-      .mockResolvedValueOnce({
-        id: 'task-1',
-        projectId: 'project-1',
-        title: 'Ship launch checklist',
-        description: null,
-        status: TaskStatus.TODO,
-        position: null,
-        assigneeId: null,
-        dueDate: null,
-        createdAt: new Date('2026-04-01T09:00:00.000Z'),
-        updatedAt: new Date('2026-04-01T09:00:00.000Z'),
-      });
+    mockPrismaService.task.findUnique.mockResolvedValueOnce({
+      id: 'task-1',
+      projectId: 'project-1',
+      project: {
+        ownerId: 'owner-1',
+      },
+    });
+    mockTasksService.getTask.mockResolvedValue({
+      id: 'task-1',
+      projectId: 'project-1',
+      title: 'Ship launch checklist',
+      description: null,
+      acceptanceCriteria: null,
+      notes: null,
+      parentTaskId: null,
+      statusId: 'status-todo',
+      status: {
+        id: 'status-todo',
+        name: 'Todo',
+        position: 1,
+        isClosed: false,
+        color: 'SLATE',
+      },
+      position: null,
+      assigneeId: null,
+      dueDate: null,
+      links: [],
+      checklistItems: [],
+      subtasks: [],
+      createdAt: '2026-04-01T09:00:00.000Z',
+      updatedAt: '2026-04-01T09:00:00.000Z',
+    });
 
     await expect(
       executeTaskRoute({
@@ -696,7 +836,7 @@ async function executeTaskRoute({
     description?: string | null;
     assigneeId?: string | null;
     dueDate?: string | null;
-    status?: TaskStatus;
+    statusId?: string;
     position?: number | null;
   };
 }) {

@@ -4,6 +4,8 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { TaskLogsService } from '../../task-logs/service/task-logs.service';
+import { TaskCommandsService } from './task-commands.service';
+import { TaskQueriesService } from './task-queries.service';
 import { TasksService } from './tasks.service';
 
 describe('TasksService', () => {
@@ -63,6 +65,8 @@ describe('TasksService', () => {
 
   let tasksService: TasksService;
   let taskLogsService: TaskLogsService;
+  let taskQueriesService: TaskQueriesService;
+  let taskCommandsService: TaskCommandsService;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -86,7 +90,12 @@ describe('TasksService', () => {
     );
 
     taskLogsService = new TaskLogsService(mockPrismaService);
-    tasksService = new TasksService(mockPrismaService, taskLogsService);
+    taskQueriesService = new TaskQueriesService(mockPrismaService);
+    taskCommandsService = new TaskCommandsService(
+      mockPrismaService,
+      taskLogsService,
+    );
+    tasksService = new TasksService(taskQueriesService, taskCommandsService);
   });
 
   it('lists project tasks grouped by status with board-stable ordering', async () => {

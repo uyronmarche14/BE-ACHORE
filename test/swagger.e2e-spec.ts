@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { Duplex } from 'node:stream';
-import { pathToFileURL } from 'node:url';
 import type { INestApplication } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 
@@ -33,6 +33,7 @@ type ResponseEndCallback = () => void;
 type ResponseEndEncoding = BufferEncoding | ResponseEndCallback;
 
 const ORIGINAL_ENV = { ...process.env };
+const requireBuiltModule = createRequire(__filename);
 
 describe('Swagger docs (e2e)', () => {
   let app: INestApplication | undefined;
@@ -340,6 +341,7 @@ async function invokeExpressRoute(handler: HttpRouteHandler, url: string) {
 async function loadBuiltModule<TModule>(
   relativePath: string,
 ): Promise<TModule> {
-  const moduleUrl = pathToFileURL(join(__dirname, relativePath)).href;
-  return (await import(moduleUrl)) as TModule;
+  return await Promise.resolve(
+    requireBuiltModule(join(__dirname, relativePath)) as TModule,
+  );
 }

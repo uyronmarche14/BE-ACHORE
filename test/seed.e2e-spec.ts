@@ -11,6 +11,10 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../src/database/prisma.service';
 import { AuthService } from '../src/modules/auth/service/auth.service';
 import { ProjectsService } from '../src/modules/projects/service/projects.service';
+import { ProjectActivityService } from '../src/modules/projects/service/project-activity.service';
+import { ProjectMutationsService } from '../src/modules/projects/service/project-mutations.service';
+import { ProjectQueriesService } from '../src/modules/projects/service/project-queries.service';
+import { ProjectStatusesService } from '../src/modules/projects/service/project-statuses.service';
 import { MailService } from '../src/modules/mail/service/mail.service';
 import { SeedController } from '../src/modules/seed/controller/seed.controller';
 import {
@@ -22,6 +26,8 @@ import {
 } from '../src/modules/seed/seed-data';
 import { SeedService } from '../src/modules/seed/service/seed.service';
 import { TaskLogsService } from '../src/modules/task-logs/service/task-logs.service';
+import { TaskCommandsService } from '../src/modules/tasks/service/task-commands.service';
+import { TaskQueriesService } from '../src/modules/tasks/service/task-queries.service';
 import { TasksService } from '../src/modules/tasks/service/tasks.service';
 
 type UserRecord = {
@@ -566,7 +572,13 @@ describe('Seed demo flow (e2e)', () => {
       providers: [
         SeedService,
         TaskLogsService,
+        TaskQueriesService,
+        TaskCommandsService,
         TasksService,
+        ProjectQueriesService,
+        ProjectMutationsService,
+        ProjectStatusesService,
+        ProjectActivityService,
         ProjectsService,
         AuthService,
         {
