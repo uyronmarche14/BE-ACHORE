@@ -14,6 +14,7 @@ import { getAppRuntimeConfig } from '../../../config/runtime-config';
 import { PrismaService } from '../../../database/prisma.service';
 import type { AuthUserResponse } from '../../auth/types/auth-response.type';
 import { MailService } from '../../mail/service/mail.service';
+import { buildProjectInviteEmailTemplate } from '../../mail/templates/project-invite-email.template';
 import type { CreateProjectInviteDto } from '../dto/create-project-invite.dto';
 import {
   mapAcceptInviteResponse,
@@ -119,17 +120,24 @@ export class ProjectInvitesService {
       },
     });
 
+    const appRuntimeConfig = getAppRuntimeConfig(this.configService);
     const inviteLink = new URL(
       `/invite/${rawToken}`,
-      getAppRuntimeConfig(this.configService).frontendUrl,
+      appRuntimeConfig.frontendUrl,
     );
+    const projectInviteEmail = buildProjectInviteEmailTemplate({
+      inviterName: currentUser.name,
+      inviteeEmail,
+      projectName: project.name,
+      inviteUrl: inviteLink.toString(),
+      frontendUrl: appRuntimeConfig.frontendUrl,
+      role: inviteRole,
+    });
 
     try {
       await this.mailService.sendMail({
         to: inviteeEmail,
-        subject: `You were invited to ${project.name}`,
-        text: `${currentUser.name} invited you to join ${project.name}. Open ${inviteLink.toString()} to continue.`,
-        html: `<p>${escapeHtml(currentUser.name)} invited you to join ${escapeHtml(project.name)}.</p><p>Open the invite link: <a href="${inviteLink.toString()}">${inviteLink.toString()}</a>.</p>`,
+        ...projectInviteEmail,
       });
     } catch (error) {
       // Roll back the invite row so the project does not accumulate "sent" invites
@@ -269,13 +277,4 @@ export class ProjectInvitesService {
 
     return invite;
   }
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 }

@@ -26,7 +26,7 @@ The API is exposed under `/api/v1` and includes Swagger documentation when
 - `class-validator` and `class-transformer`
 - `joi` environment validation
 - JWT access tokens and refresh-token rotation
-- Nodemailer for verification and invite delivery
+- Resend for production mail delivery, with Nodemailer SMTP kept as a local/dev fallback
 
 ## Local Defaults
 
@@ -43,12 +43,15 @@ Important environment variables:
 
 - `PORT`
 - `APP_URL`
-- `FRONTEND_URL`
+- `FRONTEND_URL` — the main frontend base URL used for email verification and invite links
 - `DATABASE_URL`
 - `JWT_ACCESS_SECRET`
 - `JWT_REFRESH_SECRET`
 - `SEED_ENABLED`
-- optional SMTP variables for email delivery
+- `MAIL_PROVIDER`
+- `MAIL_FROM`
+- optional `RESEND_API_KEY` for production mail delivery
+- optional SMTP variables for local email delivery
 
 ## Run Locally
 
@@ -137,8 +140,11 @@ pnpm build
 
 ## Known Issues / Incomplete Functionality
 
-- Email verification and invite delivery require SMTP configuration. Without
-  valid SMTP settings, those endpoints correctly refuse to send email.
+- On Render free tier, outbound SMTP ports are blocked. Production email
+  delivery should use Resend over HTTPS instead of Gmail SMTP.
+- Email verification and invite delivery require a configured mail provider.
+  Without valid Resend or SMTP settings, those endpoints correctly refuse to
+  send email.
 - This package does not currently expose a dedicated standalone `typecheck`
   script. Lint, tests, and build are the main verification steps.
 

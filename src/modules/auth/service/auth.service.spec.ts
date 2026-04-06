@@ -235,6 +235,31 @@ describe('AuthService', () => {
         subject: 'Verify your Archon account',
       }),
     );
+    const sendMailCalls = sendMail.mock.calls as Array<
+      [
+        {
+          text: string;
+          html: string;
+        },
+      ]
+    >;
+    const verificationEmail = sendMailCalls[0][0];
+
+    expect(verificationEmail.text).toContain(
+      'http://localhost:3000/verify-email?token=',
+    );
+    expect(verificationEmail.text).toContain('email=jane%40example.com');
+    expect(verificationEmail.text).toContain(
+      'next=%2Fapp%2Fprojects%2Fproject-1',
+    );
+    expect(verificationEmail.html).toContain('Verify my account');
+    expect(verificationEmail.html).toContain(
+      'http://localhost:3000/verify-email?token=',
+    );
+    expect(verificationEmail.html).toContain('email=jane%40example.com');
+    expect(verificationEmail.html).toContain(
+      'next=%2Fapp%2Fprojects%2Fproject-1',
+    );
     expect(result).toEqual({
       message: 'Check your email to verify your account',
       email: 'jane@example.com',

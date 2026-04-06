@@ -18,6 +18,7 @@ import {
 import { getAuthRuntimeConfig } from '../../../config/runtime-config';
 import { PrismaService } from '../../../database/prisma.service';
 import { MailService } from '../../mail/service/mail.service';
+import { buildVerificationEmailTemplate } from '../../mail/templates/verification-email.template';
 import type { LoginDto } from '../dto/login.dto';
 import type { ResendVerificationDto } from '../dto/resend-verification.dto';
 import type { SignupDto } from '../dto/signup.dto';
@@ -487,7 +488,11 @@ export class AuthService {
     const verificationStartedAt = Date.now();
     const rawToken = generateOpaqueToken();
     const tokenHash = hashOpaqueToken(rawToken);
-    const verificationLink = this.buildVerificationLink(rawToken, redirectPath);
+    const verificationLink = this.buildVerificationLink(
+      rawToken,
+      user.email,
+      redirectPath,
+    );
 
     // Only keep one active verification token per user so the latest email always
     // represents the canonical path forward.
@@ -511,21 +516,30 @@ export class AuthService {
       `Stored email verification token for ${user.email} in ${Date.now() - verificationStartedAt}ms; sending email next.`,
     );
 
+    const verificationEmail = buildVerificationEmailTemplate({
+      recipientName: user.name,
+      verificationUrl: verificationLink,
+      frontendUrl: getAuthRuntimeConfig(this.configService).frontendUrl,
+    });
+
     await this.mailService.sendMail({
       to: user.email,
-      subject: 'Verify your Archon account',
-      text: `Hi ${user.name}, verify your account by opening ${verificationLink}`,
-      html: `<p>Hi ${escapeHtml(user.name)},</p><p>Verify your account by opening <a href="${verificationLink}">${verificationLink}</a>.</p>`,
+      ...verificationEmail,
     });
     this.logger.log(
       `Verification email flow for ${user.email} completed in ${Date.now() - verificationStartedAt}ms.`,
     );
   }
 
-  private buildVerificationLink(token: string, redirectPath?: string) {
+  private buildVerificationLink(
+    token: string,
+    email: string,
+    redirectPath?: string,
+  ) {
     const authConfig = getAuthRuntimeConfig(this.configService);
     const verificationUrl = new URL('/verify-email', authConfig.frontendUrl);
     verificationUrl.searchParams.set('token', token);
+    verificationUrl.searchParams.set('email', email);
 
     if (redirectPath) {
       verificationUrl.searchParams.set('next', redirectPath);
@@ -558,13 +572,4 @@ function isPrismaUniqueConstraintError(error: unknown) {
     'code' in error &&
     error.code === 'P2002'
   );
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 }
