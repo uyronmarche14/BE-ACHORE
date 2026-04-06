@@ -27,8 +27,8 @@ export const environmentValidationSchema = Joi.object({
   TRUST_PROXY_HOPS: Joi.number().integer().min(0).optional(),
   EMAIL_VERIFICATION_MODE: Joi.string()
     .valid('required', 'bypass')
-    .default('required'),
-  INVITE_DELIVERY_MODE: Joi.string().valid('email', 'link').default('email'),
+    .default('bypass'),
+  INVITE_DELIVERY_MODE: Joi.string().valid('email', 'link').default('link'),
   MAIL_PROVIDER: Joi.string().valid('smtp', 'resend').default('smtp'),
   MAIL_FROM: Joi.string().trim().min(3).optional(),
   RESEND_API_KEY: Joi.string().trim().optional(),

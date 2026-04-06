@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class SwaggerCreateProjectInviteResponseDto {
   @ApiProperty({
-    example: 'Invite sent successfully',
+    example: 'Invite link ready',
   })
   message!: string;
 
@@ -20,7 +20,7 @@ export class SwaggerCreateProjectInviteResponseDto {
 
   @ApiProperty({
     enum: ['email', 'link'],
-    example: 'email',
+    example: 'link',
   })
   deliveryMode!: 'email' | 'link';
 

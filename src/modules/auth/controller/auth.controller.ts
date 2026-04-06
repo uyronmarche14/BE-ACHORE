@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   ApiBearerAuth,
   ApiCookieAuth,
+  ApiExcludeEndpoint,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
@@ -201,6 +202,7 @@ export class AuthController {
 
   @Post('verify-email/confirm')
   @UseGuards(AuthRateLimitGuard)
+  @ApiExcludeEndpoint()
   @AuthRateLimit({
     key: 'verify-email-confirm',
     limit: 10,
@@ -225,6 +227,7 @@ export class AuthController {
 
   @Post('verify-email/resend')
   @UseGuards(AuthRateLimitGuard)
+  @ApiExcludeEndpoint()
   @AuthRateLimit({
     key: 'verify-email-resend',
     limit: 5,
