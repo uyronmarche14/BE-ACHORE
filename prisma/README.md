@@ -1,12 +1,11 @@
 # Prisma Workspace
 
-This directory owns the MySQL Prisma schema, migrations, and seed entrypoint.
+This directory owns the MySQL Prisma schema and migrations.
 
 Current scope:
 
 - canonical v1 enums and models
 - initial SQL migration
-- seed entrypoint placeholder for later stories
 - datasource configuration lives in `backend/prisma.config.ts` for Prisma 7
 
 Useful commands from `backend/`:

@@ -9,7 +9,7 @@ activity, and reviewer demo seeding.
 The backend owns:
 
 - signup, login, refresh rotation, logout, and current-user session APIs
-- email verification and invite flows
+- direct-link invite flows and optional email-delivery support when explicitly enabled
 - project CRUD, membership checks, project statuses, and project activity
 - task CRUD, task status changes, comments, attachments, and audit logs
 - non-production reviewer/demo seeding through a gated seed endpoint
@@ -26,7 +26,7 @@ The API is exposed under `/api/v1` and includes Swagger documentation when
 - `class-validator` and `class-transformer`
 - `joi` environment validation
 - JWT access tokens and refresh-token rotation
-- Resend for production mail delivery, with Nodemailer SMTP kept as a local/dev fallback
+- optional dormant mail support via Resend or SMTP when email flows are explicitly re-enabled
 
 ## Local Defaults
 
@@ -43,17 +43,17 @@ Important environment variables:
 
 - `PORT`
 - `APP_URL`
-- `FRONTEND_URL` — the main frontend base URL used for email verification and invite links
+- `FRONTEND_URL` — the main frontend base URL used for invite links and any optional email callbacks
 - `DATABASE_URL`
 - `JWT_ACCESS_SECRET`
 - `JWT_REFRESH_SECRET`
 - `SEED_ENABLED`
 - `EMAIL_VERIFICATION_MODE`
 - `INVITE_DELIVERY_MODE`
-- `MAIL_PROVIDER`
-- `MAIL_FROM`
-- optional `RESEND_API_KEY` for production mail delivery
-- optional SMTP variables for local email delivery
+- optional `MAIL_PROVIDER`
+- optional `MAIL_FROM`
+- optional `RESEND_API_KEY` if you later re-enable email delivery
+- optional SMTP variables if you later re-enable email delivery
 
 Hosted staging recommendation:
 
@@ -61,8 +61,10 @@ Hosted staging recommendation:
 - `INVITE_DELIVERY_MODE=link`
 
 That combination keeps signup and invites working on Render/Vercel staging even
-when real email delivery is unavailable. Production can stay on the safer
-defaults of `required` and `email`.
+when real email delivery is unavailable. The checked-in runtime defaults now
+match that no-email flow. If you want to re-enable email later, explicitly set
+`EMAIL_VERIFICATION_MODE=required` and `INVITE_DELIVERY_MODE=email`.
+No-email deployments can omit all `MAIL_*`, `RESEND_*`, and `SMTP_*` variables.
 
 ## Run Locally
 
@@ -151,13 +153,10 @@ pnpm build
 
 ## Known Issues / Incomplete Functionality
 
-- On Render free tier, outbound SMTP ports are blocked. Production email
-  delivery should use Resend over HTTPS instead of Gmail SMTP.
-- Email verification and invite delivery require a configured mail provider.
-  Without valid Resend or SMTP settings, those endpoints correctly refuse to
-  send email.
-- Hosted staging can avoid mail-provider dependencies by setting
-  `EMAIL_VERIFICATION_MODE=bypass` and `INVITE_DELIVERY_MODE=link`.
+- On Render free tier, outbound SMTP ports are blocked. If you ever re-enable
+  email delivery, prefer Resend over HTTPS instead of Gmail SMTP.
+- Dormant verification and invite email endpoints remain implemented for
+  compatibility, but the default product flow does not use them.
 - This package does not currently expose a dedicated standalone `typecheck`
   script. Lint, tests, and build are the main verification steps.
 

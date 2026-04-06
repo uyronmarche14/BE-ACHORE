@@ -309,7 +309,7 @@ describe('environment configuration', () => {
     expect(getMailRuntimeConfig(configService).mailProvider).toBe('smtp');
   });
 
-  it('defaults hosted auth modes to required verification and email invite delivery', () => {
+  it('defaults hosted auth modes to bypass verification and direct-link invite delivery', () => {
     const configService = {
       getOrThrow: jest.fn((key: string) => {
         const config: Record<string, string | number> = {
@@ -341,9 +341,9 @@ describe('environment configuration', () => {
     } as unknown as ConfigService;
 
     expect(getAppRuntimeConfig(configService).emailVerificationMode).toBe(
-      'required',
+      'bypass',
     );
-    expect(getAppRuntimeConfig(configService).inviteDeliveryMode).toBe('email');
+    expect(getAppRuntimeConfig(configService).inviteDeliveryMode).toBe('link');
   });
 
   it('honors explicit hosted auth mode overrides', () => {

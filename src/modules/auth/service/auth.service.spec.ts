@@ -205,6 +205,7 @@ describe('AuthService', () => {
   });
 
   it('creates an unverified member and sends a verification email during signup', async () => {
+    optionalConfigValues.EMAIL_VERIFICATION_MODE = 'required';
     const authService = createAuthService();
 
     const result = await authService.signup({
@@ -328,6 +329,7 @@ describe('AuthService', () => {
   });
 
   it('rolls back the new user when verification mail setup fails during signup', async () => {
+    optionalConfigValues.EMAIL_VERIFICATION_MODE = 'required';
     sendMail.mockRejectedValue(new Error('SMTP is not configured'));
     const authService = createAuthService();
 
@@ -380,6 +382,7 @@ describe('AuthService', () => {
   });
 
   it('rejects login when email verification is still pending', async () => {
+    optionalConfigValues.EMAIL_VERIFICATION_MODE = 'required';
     mockPrismaService.user.findUnique.mockResolvedValue(unverifiedUser);
     const authService = createAuthService();
 
@@ -477,6 +480,7 @@ describe('AuthService', () => {
   });
 
   it('confirms email verification and consumes the verification token', async () => {
+    optionalConfigValues.EMAIL_VERIFICATION_MODE = 'required';
     const authService = createAuthService();
 
     const result = await authService.confirmEmailVerification({
@@ -508,7 +512,30 @@ describe('AuthService', () => {
     });
   });
 
+  it('returns a dormant verification success when bypass mode is active', async () => {
+    optionalConfigValues.EMAIL_VERIFICATION_MODE = 'bypass';
+    const authService = createAuthService();
+
+    const result = await authService.confirmEmailVerification({
+      token: 'test-confirmation-placeholder',
+    });
+
+    expect(
+      mockPrismaService.emailVerificationToken.findUnique,
+    ).not.toHaveBeenCalled();
+    expect(mockPrismaService.user.update).not.toHaveBeenCalled();
+    expect(
+      mockPrismaService.emailVerificationToken.update,
+    ).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      verified: true,
+      email: '',
+      redirectPath: null,
+    });
+  });
+
   it('resends verification mail only for existing unverified accounts', async () => {
+    optionalConfigValues.EMAIL_VERIFICATION_MODE = 'required';
     mockPrismaService.user.findUnique.mockResolvedValue(unverifiedUser);
     const authService = createAuthService();
 

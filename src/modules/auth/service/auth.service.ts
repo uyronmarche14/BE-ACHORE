@@ -331,6 +331,18 @@ export class AuthService {
   async confirmEmailVerification(
     verifyEmailConfirmDto: VerifyEmailConfirmDto,
   ): Promise<VerifyEmailConfirmResult> {
+    if (!this.isEmailVerificationRequired()) {
+      this.logger.log(
+        'Email verification confirmation requested while verification bypass is active; returning dormant success response.',
+      );
+
+      return {
+        verified: true,
+        email: '',
+        redirectPath: null,
+      };
+    }
+
     const now = new Date();
     const tokenHash = hashOpaqueToken(verifyEmailConfirmDto.token);
     const verificationToken =
@@ -385,6 +397,10 @@ export class AuthService {
     resendVerificationDto: ResendVerificationDto,
   ): Promise<ResendVerificationResult> {
     if (!this.isEmailVerificationRequired()) {
+      this.logger.log(
+        `Email verification resend requested for ${resendVerificationDto.email} while verification bypass is active; skipping mail delivery.`,
+      );
+
       return {
         message:
           'If the account needs verification, a new email is on the way.',
