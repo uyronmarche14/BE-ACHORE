@@ -19,6 +19,11 @@ jest.mock('bcrypt', () => ({
 }));
 
 describe('AuthService', () => {
+  let optionalConfigValues: Record<
+    string,
+    boolean | number | string | undefined
+  >;
+
   const mockUser: User = {
     id: 'user-1',
     name: 'Jane Doe',
@@ -61,13 +66,15 @@ describe('AuthService', () => {
 
       return config[key];
     }),
-    get: jest.fn((key: string) => {
-      if (key === 'REFRESH_COOKIE_SECURE') {
-        return false;
-      }
-
-      return undefined;
-    }),
+    get: jest.fn(
+      (key: string) =>
+        optionalConfigValues[key] ??
+        (
+          {
+            REFRESH_COOKIE_SECURE: false,
+          } as Record<string, boolean | number | string | undefined>
+        )[key],
+    ),
   } as unknown as ConfigService;
 
   const mockJwtService = {
@@ -127,6 +134,7 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    optionalConfigValues = {};
 
     bcryptHash.mockReset();
     bcryptCompare.mockReset();
@@ -267,6 +275,45 @@ describe('AuthService', () => {
     });
   });
 
+  it('creates a verified member immediately when verification bypass is enabled', async () => {
+    optionalConfigValues.EMAIL_VERIFICATION_MODE = 'bypass';
+    mockPrismaService.user.create.mockResolvedValue({
+      ...mockUser,
+      emailVerifiedAt: new Date('2026-04-06T00:00:00.000Z'),
+    });
+    const authService = createAuthService();
+
+    const result = await authService.signup({
+      name: 'Jane Doe',
+      email: 'jane@example.com',
+      password: 'StrongPass1',
+      redirectPath: '/app/projects/project-1',
+    });
+
+    expect(mockPrismaService.user.create).toHaveBeenCalledWith({
+      data: {
+        id: expect.any(String),
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        passwordHash: 'hashed-value',
+        role: 'MEMBER',
+        emailVerifiedAt: expect.any(Date),
+      },
+    });
+    expect(
+      mockPrismaService.emailVerificationToken.deleteMany,
+    ).not.toHaveBeenCalled();
+    expect(
+      mockPrismaService.emailVerificationToken.create,
+    ).not.toHaveBeenCalled();
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      message: 'Account created successfully. You can log in now.',
+      email: 'jane@example.com',
+      emailVerificationRequired: false,
+    });
+  });
+
   it('maps duplicate email errors to conflict exceptions', async () => {
     mockPrismaService.user.create.mockRejectedValue({ code: 'P2002' });
     const authService = createAuthService();
@@ -353,6 +400,24 @@ describe('AuthService', () => {
     });
   });
 
+  it('allows login for an unverified user when verification bypass is enabled', async () => {
+    optionalConfigValues.EMAIL_VERIFICATION_MODE = 'bypass';
+    mockPrismaService.user.findUnique.mockResolvedValue(unverifiedUser);
+    jwtSignAsync
+      .mockResolvedValueOnce('login-access-token')
+      .mockResolvedValueOnce('login-refresh-token');
+    bcryptHash.mockResolvedValueOnce('hashed-login-refresh-token');
+    const authService = createAuthService();
+
+    const result = await authService.login({
+      email: 'jane@example.com',
+      password: 'StrongPass1',
+    });
+
+    expect(result.accessToken).toBe('login-access-token');
+    expect(result.refreshToken).toBe('login-refresh-token');
+  });
+
   it('rejects invalid email or password during login with a generic 401', async () => {
     bcryptCompare.mockResolvedValueOnce(false);
     const authService = createAuthService();
@@ -394,6 +459,21 @@ describe('AuthService', () => {
       refreshToken: 'rotated-refresh-token',
       refreshTokenExpiresAt: expect.any(Date),
     });
+  });
+
+  it('rotates refresh tokens for unverified users when verification bypass is enabled', async () => {
+    optionalConfigValues.EMAIL_VERIFICATION_MODE = 'bypass';
+    mockPrismaService.user.findUnique.mockResolvedValue(unverifiedUser);
+    jwtSignAsync
+      .mockResolvedValueOnce('rotated-access-token')
+      .mockResolvedValueOnce('rotated-refresh-token');
+    bcryptHash.mockResolvedValueOnce('hashed-rotated-refresh-token');
+    const authService = createAuthService();
+
+    const result = await authService.refresh('existing-refresh-token');
+
+    expect(result.accessToken).toBe('rotated-access-token');
+    expect(result.refreshToken).toBe('rotated-refresh-token');
   });
 
   it('confirms email verification and consumes the verification token', async () => {
@@ -447,6 +527,26 @@ describe('AuthService', () => {
     });
   });
 
+  it('treats resend verification as a no-op when verification bypass is enabled', async () => {
+    optionalConfigValues.EMAIL_VERIFICATION_MODE = 'bypass';
+    mockPrismaService.user.findUnique.mockResolvedValue(unverifiedUser);
+    const authService = createAuthService();
+
+    const result = await authService.resendEmailVerification({
+      email: 'jane@example.com',
+      redirectPath: '/app',
+    });
+
+    expect(mockPrismaService.user.findUnique).not.toHaveBeenCalled();
+    expect(
+      mockPrismaService.emailVerificationToken.create,
+    ).not.toHaveBeenCalled();
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      message: 'If the account needs verification, a new email is on the way.',
+    });
+  });
+
   it('returns the current user for a valid access token', async () => {
     const authService = createAuthService();
 
@@ -461,6 +561,16 @@ describe('AuthService', () => {
         emailVerifiedAt: '2026-04-01T00:00:00.000Z',
       },
     });
+  });
+
+  it('returns the current user even if unverified when verification bypass is enabled', async () => {
+    optionalConfigValues.EMAIL_VERIFICATION_MODE = 'bypass';
+    mockPrismaService.user.findUnique.mockResolvedValue(unverifiedUser);
+    const authService = createAuthService();
+
+    const result = await authService.getCurrentUser('access-token');
+
+    expect(result.user.emailVerifiedAt).toBeNull();
   });
 
   function createAuthService() {

@@ -10,14 +10,7 @@ export class PrismaService
 {
   constructor(configService: ConfigService) {
     const databaseUrl = configService.getOrThrow<string>('DATABASE_URL');
-    const parsedUrl = new URL(databaseUrl);
-    const adapter = new PrismaMariaDb({
-      host: parsedUrl.hostname,
-      port: parsedUrl.port ? Number.parseInt(parsedUrl.port, 10) : undefined,
-      user: decodeURIComponent(parsedUrl.username),
-      password: decodeURIComponent(parsedUrl.password),
-      database: parsedUrl.pathname.replace(/^\//, '') || undefined,
-    });
+    const adapter = new PrismaMariaDb(databaseUrl);
 
     super({ adapter });
   }

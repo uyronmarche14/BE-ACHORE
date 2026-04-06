@@ -82,7 +82,8 @@ export class AuthController {
     windowMs: 60_000,
   })
   @ApiOperation({
-    summary: 'Create a new account and trigger email verification.',
+    summary:
+      'Create a new account and continue with the configured onboarding flow.',
   })
   @ApiEnvelopedResponse({
     status: 201,

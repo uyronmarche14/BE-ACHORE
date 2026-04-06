@@ -17,6 +17,18 @@ export class SwaggerCreateProjectInviteResponseDto {
     format: 'date-time',
   })
   expiresAt!: string;
+
+  @ApiProperty({
+    enum: ['email', 'link'],
+    example: 'email',
+  })
+  deliveryMode!: 'email' | 'link';
+
+  @ApiProperty({
+    nullable: true,
+    example: 'https://archon.example.com/invite/raw-token',
+  })
+  inviteUrl!: string | null;
 }
 
 export class SwaggerInviteProjectDto {
@@ -83,4 +95,47 @@ export class SwaggerAcceptInviteResponseDto {
     type: () => SwaggerInviteProjectDto,
   })
   project!: SwaggerInviteProjectDto;
+}
+
+export class SwaggerPendingProjectInviteDto {
+  @ApiProperty({
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.pending-invite.review-token',
+  })
+  token!: string;
+
+  @ApiProperty({
+    example: '2026-04-06T09:15:23.000Z',
+    format: 'date-time',
+  })
+  createdAt!: string;
+
+  @ApiProperty({
+    type: () => SwaggerInviteProjectDto,
+  })
+  project!: SwaggerInviteProjectDto;
+
+  @ApiProperty({
+    enum: ProjectMemberRole,
+    example: ProjectMemberRole.MEMBER,
+  })
+  role!: ProjectMemberRole;
+
+  @ApiProperty({
+    example: '2026-04-10T09:15:23.000Z',
+    format: 'date-time',
+  })
+  expiresAt!: string;
+
+  @ApiProperty({
+    type: () => SwaggerInviteUserDto,
+  })
+  invitedBy!: SwaggerInviteUserDto;
+}
+
+export class SwaggerPendingProjectInvitesResponseDto {
+  @ApiProperty({
+    type: () => SwaggerPendingProjectInviteDto,
+    isArray: true,
+  })
+  items!: SwaggerPendingProjectInviteDto[];
 }

@@ -18,11 +18,13 @@ import type {
   AcceptInviteResponse,
   CreateProjectInviteResponse,
   InvitePreviewResponse,
+  PendingProjectInvitesResponse,
 } from '../types/project-invite-response.type';
 import {
   SwaggerAcceptInviteResponseDto,
   SwaggerCreateProjectInviteResponseDto,
   SwaggerInvitePreviewResponseDto,
+  SwaggerPendingProjectInvitesResponseDto,
 } from '../swagger/project-invite-response.models';
 
 @ApiTags('Project Invites')
@@ -36,7 +38,7 @@ export class ProjectInvitesController {
     ownerOnly: true,
   })
   @ApiOperation({
-    summary: 'Create a project invite and send the email.',
+    summary: 'Create a project invite and deliver it by email or direct link.',
   })
   @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
   @ApiProjectIdParam()
@@ -56,6 +58,23 @@ export class ProjectInvitesController {
       projectId,
       createProjectInviteDto,
     );
+  }
+
+  @Get('invites/pending/items')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'List active project invites for the current authenticated user.',
+  })
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
+  @ApiEnvelopedResponse({
+    description: 'Pending invites loaded successfully.',
+    type: SwaggerPendingProjectInvitesResponseDto,
+  })
+  @ApiStandardErrorResponses([401])
+  listPendingInvites(
+    @CurrentUser() currentUser: AuthUserResponse,
+  ): Promise<PendingProjectInvitesResponse> {
+    return this.projectInvitesService.listPendingInvites(currentUser);
   }
 
   @Get('invites/:token')

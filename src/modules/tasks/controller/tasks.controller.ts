@@ -32,6 +32,7 @@ import { UpdateTaskCommentDto } from '../dto/update-task-comment.dto';
 import { UpdateTaskDto } from '../dto/update-task.dto';
 import { UpdateTaskStatusDto } from '../dto/update-task-status.dto';
 import { TaskAttachmentsService } from '../service/task-attachments.service';
+import { TaskAssignmentNotificationsService } from '../service/task-assignment-notifications.service';
 import { TaskCommentsService } from '../service/task-comments.service';
 import { TasksService } from '../service/tasks.service';
 import type {
@@ -44,6 +45,7 @@ import type {
   TaskCommentsResponse,
   TaskResponse,
 } from '../types/task-response.type';
+import type { TaskAssignmentNotificationsResponse } from '../types/task-notification-response.type';
 import {
   SwaggerTaskActionResponseDto,
   SwaggerTaskAttachmentResponseDto,
@@ -54,6 +56,7 @@ import {
   SwaggerProjectTasksResponseDto,
   SwaggerTaskResponseDto,
 } from '../swagger/task-response.models';
+import { SwaggerTaskAssignmentNotificationsResponseDto } from '../swagger/task-notification-response.models';
 
 @ApiTags('Tasks')
 @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
@@ -61,6 +64,7 @@ import {
 export class TasksController {
   constructor(
     private readonly tasksService: TasksService,
+    private readonly taskAssignmentNotificationsService: TaskAssignmentNotificationsService,
     private readonly taskCommentsService: TaskCommentsService,
     private readonly taskAttachmentsService: TaskAttachmentsService,
   ) {}
@@ -102,6 +106,24 @@ export class TasksController {
     @Body() createTaskDto: CreateTaskDto,
   ): Promise<TaskResponse> {
     return this.tasksService.createTask(currentUser, projectId, createTaskDto);
+  }
+
+  @Get('tasks/assigned-notifications')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'List recent task assignment notifications for the current user.',
+  })
+  @ApiEnvelopedResponse({
+    description: 'Task assignment notifications loaded successfully.',
+    type: SwaggerTaskAssignmentNotificationsResponseDto,
+  })
+  @ApiStandardErrorResponses([401])
+  listAssignedTaskNotifications(
+    @CurrentUser() currentUser: AuthUserResponse,
+  ): Promise<TaskAssignmentNotificationsResponse> {
+    return this.taskAssignmentNotificationsService.listAssignedTaskNotifications(
+      currentUser,
+    );
   }
 
   @Get('tasks/:taskId')

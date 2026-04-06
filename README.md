@@ -48,10 +48,21 @@ Important environment variables:
 - `JWT_ACCESS_SECRET`
 - `JWT_REFRESH_SECRET`
 - `SEED_ENABLED`
+- `EMAIL_VERIFICATION_MODE`
+- `INVITE_DELIVERY_MODE`
 - `MAIL_PROVIDER`
 - `MAIL_FROM`
 - optional `RESEND_API_KEY` for production mail delivery
 - optional SMTP variables for local email delivery
+
+Hosted staging recommendation:
+
+- `EMAIL_VERIFICATION_MODE=bypass`
+- `INVITE_DELIVERY_MODE=link`
+
+That combination keeps signup and invites working on Render/Vercel staging even
+when real email delivery is unavailable. Production can stay on the safer
+defaults of `required` and `email`.
 
 ## Run Locally
 
@@ -145,6 +156,8 @@ pnpm build
 - Email verification and invite delivery require a configured mail provider.
   Without valid Resend or SMTP settings, those endpoints correctly refuse to
   send email.
+- Hosted staging can avoid mail-provider dependencies by setting
+  `EMAIL_VERIFICATION_MODE=bypass` and `INVITE_DELIVERY_MODE=link`.
 - This package does not currently expose a dedicated standalone `typecheck`
   script. Lint, tests, and build are the main verification steps.
 

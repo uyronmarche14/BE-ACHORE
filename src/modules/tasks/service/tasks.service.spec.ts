@@ -327,6 +327,10 @@ describe('TasksService', () => {
     mockPrismaService.projectMember.findUnique.mockResolvedValue({
       id: 'membership-1',
     });
+    mockPrismaService.user.findUnique.mockResolvedValue({
+      id: 'member-2',
+      name: 'Jordan Lane',
+    });
     mockPrismaService.projectStatus.findFirst.mockResolvedValue(
       createStatusRecord({
         id: 'status-progress',
@@ -400,12 +404,25 @@ describe('TasksService', () => {
         select: expect.any(Object),
       }),
     );
-    expect(mockPrismaService.taskLog.create).toHaveBeenCalledWith({
+    expect(mockPrismaService.taskLog.create).toHaveBeenNthCalledWith(1, {
       data: expect.objectContaining({
         taskId: 'task-1',
         actorId: 'member-1',
         eventType: 'TASK_CREATED',
         summary: 'Member User created the task',
+      }),
+    });
+    expect(mockPrismaService.taskLog.create).toHaveBeenNthCalledWith(2, {
+      data: expect.objectContaining({
+        taskId: 'task-1',
+        actorId: 'member-1',
+        eventType: 'TASK_UPDATED',
+        fieldName: 'assigneeId',
+        oldValue: Prisma.JsonNull,
+        newValue: {
+          id: 'member-2',
+          name: 'Jordan Lane',
+        },
       }),
     });
     expect(result).toEqual({

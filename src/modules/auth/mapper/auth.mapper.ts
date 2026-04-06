@@ -34,7 +34,7 @@ export function mapSignupResponse(input: SignupResponse): SignupResponse {
   return {
     message: input.message,
     email: input.email,
-    emailVerificationRequired: true,
+    emailVerificationRequired: input.emailVerificationRequired,
   };
 }
 

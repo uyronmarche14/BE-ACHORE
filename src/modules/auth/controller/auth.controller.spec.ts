@@ -119,6 +119,30 @@ describe('AuthController', () => {
     );
   });
 
+  it('preserves a bypassed signup response without forcing verification to true', async () => {
+    authService.signup.mockResolvedValueOnce({
+      message: 'Account created successfully. You can log in now.',
+      email: 'jane@example.com',
+      emailVerificationRequired: false,
+    });
+    const response = createResponse();
+
+    const result = await authController.signup(
+      {
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        password: 'StrongPass1',
+      },
+      response,
+    );
+
+    expect(result).toEqual({
+      message: 'Account created successfully. You can log in now.',
+      email: 'jane@example.com',
+      emailVerificationRequired: false,
+    });
+  });
+
   it('returns the login response and sets the refresh token cookie', async () => {
     const response = createResponse();
 

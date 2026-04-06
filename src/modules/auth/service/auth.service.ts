@@ -67,6 +67,7 @@ export class AuthService {
     const signupStartedAt = Date.now();
     const passwordHash = await bcrypt.hash(signupDto.password, 12);
     const newUserId = randomUUID();
+    const emailVerificationRequired = this.isEmailVerificationRequired();
 
     try {
       const user = await this.prismaService.user.create({
@@ -76,12 +77,26 @@ export class AuthService {
           email: signupDto.email,
           passwordHash,
           role: 'MEMBER',
-          emailVerifiedAt: null,
+          emailVerifiedAt: emailVerificationRequired ? null : new Date(),
         },
       });
       this.logger.log(
-        `Created signup candidate ${user.id} for ${user.email}; preparing verification email.`,
+        emailVerificationRequired
+          ? `Created signup candidate ${user.id} for ${user.email}; preparing verification email.`
+          : `Created signup account ${user.id} for ${user.email} with verification bypass enabled.`,
       );
+
+      if (!emailVerificationRequired) {
+        this.logger.log(
+          `Signup flow for ${user.email} completed in ${Date.now() - signupStartedAt}ms.`,
+        );
+
+        return {
+          message: 'Account created successfully. You can log in now.',
+          email: user.email,
+          emailVerificationRequired: false,
+        };
+      }
 
       try {
         await this.createAndSendVerificationToken(user, signupDto.redirectPath);
@@ -152,7 +167,7 @@ export class AuthService {
     }
 
     // Verification is the boundary between account creation and workspace access.
-    if (!user.emailVerifiedAt) {
+    if (this.isEmailVerificationRequired() && !user.emailVerifiedAt) {
       throw createForbiddenException({
         message: 'Email verification is required before login',
         details: {
@@ -187,7 +202,10 @@ export class AuthService {
       },
     });
 
-    if (!user || !user.emailVerifiedAt) {
+    if (
+      !user ||
+      (this.isEmailVerificationRequired() && !user.emailVerifiedAt)
+    ) {
       throw this.createInvalidRefreshTokenException();
     }
 
@@ -293,7 +311,10 @@ export class AuthService {
 
       // Re-read the user record so deleted or newly unverified accounts cannot keep
       // using an otherwise valid JWT until it expires.
-      if (!user || !user.emailVerifiedAt) {
+      if (
+        !user ||
+        (this.isEmailVerificationRequired() && !user.emailVerifiedAt)
+      ) {
         throw this.createUnauthenticatedException('Authentication is required');
       }
 
@@ -363,6 +384,13 @@ export class AuthService {
   async resendEmailVerification(
     resendVerificationDto: ResendVerificationDto,
   ): Promise<ResendVerificationResult> {
+    if (!this.isEmailVerificationRequired()) {
+      return {
+        message:
+          'If the account needs verification, a new email is on the way.',
+      };
+    }
+
     const user = await this.prismaService.user.findUnique({
       where: {
         email: resendVerificationDto.email,
@@ -555,6 +583,13 @@ export class AuthService {
   private createInvalidRefreshTokenException() {
     return this.createUnauthenticatedException(
       'Refresh token is missing or invalid',
+    );
+  }
+
+  private isEmailVerificationRequired() {
+    return (
+      getAuthRuntimeConfig(this.configService).emailVerificationMode ===
+      'required'
     );
   }
 

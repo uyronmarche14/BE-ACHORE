@@ -55,10 +55,11 @@ export class SwaggerSignupResponseDto {
   email!: string;
 
   @ApiProperty({
-    enum: [true],
     example: true,
+    description:
+      'Whether the account still needs an email verification step before login.',
   })
-  emailVerificationRequired!: true;
+  emailVerificationRequired!: boolean;
 }
 
 export class SwaggerRefreshAccessTokenResponseDto {

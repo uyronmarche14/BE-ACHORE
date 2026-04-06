@@ -13,10 +13,14 @@ export type AppRuntimeConfig = {
   refreshCookieName: string;
   refreshCookieSecure: boolean;
   trustProxyHops: number;
+  emailVerificationMode: EmailVerificationMode;
+  inviteDeliveryMode: InviteDeliveryMode;
   nodeEnv: 'development' | 'test' | 'production';
 };
 
 export type MailProvider = 'smtp' | 'resend';
+export type EmailVerificationMode = 'required' | 'bypass';
+export type InviteDeliveryMode = 'email' | 'link';
 
 export type MailRuntimeConfig = {
   mailProvider: MailProvider;
@@ -57,6 +61,11 @@ export function getAppRuntimeConfig(
     trustProxyHops:
       configService.get<number>('TRUST_PROXY_HOPS') ??
       (nodeEnv === 'production' ? 1 : 0),
+    emailVerificationMode:
+      configService.get<EmailVerificationMode>('EMAIL_VERIFICATION_MODE') ??
+      'required',
+    inviteDeliveryMode:
+      configService.get<InviteDeliveryMode>('INVITE_DELIVERY_MODE') ?? 'email',
   };
 }
 
@@ -68,6 +77,7 @@ export function getAuthRuntimeConfig(configService: ConfigService) {
     jwtRefreshTtl,
     refreshCookieName,
     refreshCookieSecure,
+    emailVerificationMode,
     frontendUrl,
     nodeEnv,
   } = getAppRuntimeConfig(configService);
@@ -79,6 +89,7 @@ export function getAuthRuntimeConfig(configService: ConfigService) {
     jwtRefreshTtl,
     refreshCookieName,
     refreshCookieSecure,
+    emailVerificationMode,
     frontendUrl,
     nodeEnv,
   };

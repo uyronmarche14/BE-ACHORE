@@ -69,6 +69,30 @@ describe('environment configuration', () => {
     );
   });
 
+  it('accepts explicit hosted auth mode overrides during validation', () => {
+    const result = environmentValidationSchema.validate({
+      PORT: 4000,
+      APP_URL: 'https://api.archon.example.com',
+      FRONTEND_URL: 'https://archon.example.com',
+      DATABASE_URL: 'mysql://dowinn:dowinn@127.0.0.1:3308/dowinn',
+      JWT_ACCESS_SECRET: 'production-access-secret-123',
+      JWT_REFRESH_SECRET: 'production-refresh-secret-123',
+      EMAIL_VERIFICATION_MODE: 'bypass',
+      INVITE_DELIVERY_MODE: 'link',
+      NODE_ENV: 'production',
+    });
+
+    expect(
+      result.value as {
+        EMAIL_VERIFICATION_MODE: string;
+        INVITE_DELIVERY_MODE: string;
+      },
+    ).toMatchObject({
+      EMAIL_VERIFICATION_MODE: 'bypass',
+      INVITE_DELIVERY_MODE: 'link',
+    });
+  });
+
   it('loads APP_ENV-specific files before NODE_ENV fallbacks', () => {
     process.env = {
       ...originalEnv,
@@ -283,6 +307,78 @@ describe('environment configuration', () => {
     } as unknown as ConfigService;
 
     expect(getMailRuntimeConfig(configService).mailProvider).toBe('smtp');
+  });
+
+  it('defaults hosted auth modes to required verification and email invite delivery', () => {
+    const configService = {
+      getOrThrow: jest.fn((key: string) => {
+        const config: Record<string, string | number> = {
+          PORT: 4000,
+          APP_URL: 'http://localhost:4000',
+          FRONTEND_URL: 'http://localhost:3000',
+          JWT_ACCESS_SECRET: 'development-access-secret-123',
+          JWT_REFRESH_SECRET: 'development-refresh-secret-123',
+          JWT_ACCESS_TTL: '15m',
+          JWT_REFRESH_TTL: '7d',
+          REFRESH_COOKIE_NAME: 'archon_refresh_token',
+          NODE_ENV: 'development',
+        };
+
+        return config[key];
+      }),
+      get: jest.fn((key: string) => {
+        if (
+          key === 'REFRESH_COOKIE_SECURE' ||
+          key === 'TRUST_PROXY_HOPS' ||
+          key === 'EMAIL_VERIFICATION_MODE' ||
+          key === 'INVITE_DELIVERY_MODE'
+        ) {
+          return undefined;
+        }
+
+        return undefined;
+      }),
+    } as unknown as ConfigService;
+
+    expect(getAppRuntimeConfig(configService).emailVerificationMode).toBe(
+      'required',
+    );
+    expect(getAppRuntimeConfig(configService).inviteDeliveryMode).toBe('email');
+  });
+
+  it('honors explicit hosted auth mode overrides', () => {
+    const configService = {
+      getOrThrow: jest.fn((key: string) => {
+        const config: Record<string, string | number> = {
+          PORT: 4000,
+          APP_URL: 'https://api.archon.example.com',
+          FRONTEND_URL: 'https://archon.example.com',
+          JWT_ACCESS_SECRET: 'production-access-secret-123',
+          JWT_REFRESH_SECRET: 'production-refresh-secret-123',
+          JWT_ACCESS_TTL: '15m',
+          JWT_REFRESH_TTL: '7d',
+          REFRESH_COOKIE_NAME: 'archon_refresh_token',
+          NODE_ENV: 'production',
+        };
+
+        return config[key];
+      }),
+      get: jest.fn((key: string) => {
+        const config: Record<string, string | boolean | undefined> = {
+          EMAIL_VERIFICATION_MODE: 'bypass',
+          INVITE_DELIVERY_MODE: 'link',
+          REFRESH_COOKIE_SECURE: undefined,
+          TRUST_PROXY_HOPS: undefined,
+        };
+
+        return config[key];
+      }),
+    } as unknown as ConfigService;
+
+    expect(getAppRuntimeConfig(configService).emailVerificationMode).toBe(
+      'bypass',
+    );
+    expect(getAppRuntimeConfig(configService).inviteDeliveryMode).toBe('link');
   });
 
   it('uses MAIL_FROM ahead of SMTP_FROM when present', () => {

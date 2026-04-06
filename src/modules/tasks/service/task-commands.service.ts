@@ -98,6 +98,24 @@ export class TaskCommandsService {
         taskId: createdTask.id,
       });
 
+      if (createTaskDto.assigneeId) {
+        await this.taskLogsService.createTaskUpdatedLogs(transactionClient, {
+          actorId: currentUser.id,
+          actorName: currentUser.name,
+          taskId: createdTask.id,
+          changes: [
+            {
+              fieldName: 'assigneeId',
+              oldValue: null,
+              newValue: await this.taskLogsService.getAssigneeLogValue(
+                transactionClient,
+                createTaskDto.assigneeId,
+              ),
+            },
+          ],
+        });
+      }
+
       return mapTaskResponse(createdTask);
     });
   }
