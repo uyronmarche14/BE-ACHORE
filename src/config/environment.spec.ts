@@ -3,7 +3,11 @@ import {
   environmentValidationSchema,
   getEnvironmentFilePaths,
 } from './environment';
-import { getAppRuntimeConfig, getAuthRuntimeConfig } from './runtime-config';
+import {
+  getAppRuntimeConfig,
+  getAuthRuntimeConfig,
+  getMailRuntimeConfig,
+} from './runtime-config';
 
 describe('environment configuration', () => {
   const originalEnv = { ...process.env };
@@ -211,5 +215,149 @@ describe('environment configuration', () => {
     } as unknown as ConfigService;
 
     expect(getAppRuntimeConfig(configService).trustProxyHops).toBe(0);
+  });
+
+  it('defaults the SMTP connection timeout to 10 seconds', () => {
+    const configService = {
+      getOrThrow: jest.fn((key: string) => {
+        const config: Record<string, string | number> = {
+          PORT: 4000,
+          APP_URL: 'http://localhost:4000',
+          FRONTEND_URL: 'http://localhost:3000',
+          JWT_ACCESS_SECRET: 'development-access-secret-123',
+          JWT_REFRESH_SECRET: 'development-refresh-secret-123',
+          JWT_ACCESS_TTL: '15m',
+          JWT_REFRESH_TTL: '7d',
+          REFRESH_COOKIE_NAME: 'archon_refresh_token',
+          NODE_ENV: 'development',
+        };
+
+        return config[key];
+      }),
+      get: jest.fn((key: string) => {
+        if (
+          key === 'REFRESH_COOKIE_SECURE' ||
+          key === 'TRUST_PROXY_HOPS' ||
+          key === 'SMTP_CONNECTION_TIMEOUT_MS'
+        ) {
+          return undefined;
+        }
+
+        return undefined;
+      }),
+    } as unknown as ConfigService;
+
+    expect(getMailRuntimeConfig(configService).smtpConnectionTimeoutMs).toBe(
+      10_000,
+    );
+  });
+
+  it('defaults the mail provider to smtp', () => {
+    const configService = {
+      getOrThrow: jest.fn((key: string) => {
+        const config: Record<string, string | number> = {
+          PORT: 4000,
+          APP_URL: 'http://localhost:4000',
+          FRONTEND_URL: 'http://localhost:3000',
+          JWT_ACCESS_SECRET: 'development-access-secret-123',
+          JWT_REFRESH_SECRET: 'development-refresh-secret-123',
+          JWT_ACCESS_TTL: '15m',
+          JWT_REFRESH_TTL: '7d',
+          REFRESH_COOKIE_NAME: 'archon_refresh_token',
+          NODE_ENV: 'development',
+        };
+
+        return config[key];
+      }),
+      get: jest.fn((key: string) => {
+        if (
+          key === 'REFRESH_COOKIE_SECURE' ||
+          key === 'TRUST_PROXY_HOPS' ||
+          key === 'MAIL_PROVIDER'
+        ) {
+          return undefined;
+        }
+
+        return undefined;
+      }),
+    } as unknown as ConfigService;
+
+    expect(getMailRuntimeConfig(configService).mailProvider).toBe('smtp');
+  });
+
+  it('uses MAIL_FROM ahead of SMTP_FROM when present', () => {
+    const configService = {
+      getOrThrow: jest.fn((key: string) => {
+        const config: Record<string, string | number> = {
+          PORT: 4000,
+          APP_URL: 'https://api.archon.example.com',
+          FRONTEND_URL: 'https://archon.example.com',
+          JWT_ACCESS_SECRET: 'production-access-secret-123',
+          JWT_REFRESH_SECRET: 'production-refresh-secret-123',
+          JWT_ACCESS_TTL: '15m',
+          JWT_REFRESH_TTL: '7d',
+          REFRESH_COOKIE_NAME: 'archon_refresh_token',
+          NODE_ENV: 'production',
+        };
+
+        return config[key];
+      }),
+      get: jest.fn((key: string) => {
+        const config: Record<string, string | undefined> = {
+          MAIL_PROVIDER: 'resend',
+          MAIL_FROM: 'Archon <noreply@mail.archon.example>',
+          SMTP_FROM: 'noreply@archon.example',
+          RESEND_API_KEY: 're_test',
+        };
+
+        return config[key];
+      }),
+    } as unknown as ConfigService;
+
+    expect(getMailRuntimeConfig(configService).mailFrom).toBe(
+      'Archon <noreply@mail.archon.example>',
+    );
+  });
+
+  it('requires a Resend API key when MAIL_PROVIDER=resend', () => {
+    const result = environmentValidationSchema.validate(
+      {
+        PORT: 4000,
+        APP_URL: 'https://api.archon.example.com',
+        FRONTEND_URL: 'https://archon.example.com',
+        DATABASE_URL: 'mysql://dowinn:dowinn@127.0.0.1:3308/dowinn',
+        JWT_ACCESS_SECRET: 'production-access-secret-123',
+        JWT_REFRESH_SECRET: 'production-refresh-secret-123',
+        MAIL_PROVIDER: 'resend',
+        MAIL_FROM: 'Archon <noreply@mail.archon.example>',
+        NODE_ENV: 'production',
+      },
+      {
+        abortEarly: false,
+      },
+    );
+
+    expect(result.error?.message).toContain('RESEND_API_KEY');
+  });
+
+  it('requires MAIL_FROM or SMTP_FROM when MAIL_PROVIDER=resend', () => {
+    const result = environmentValidationSchema.validate(
+      {
+        PORT: 4000,
+        APP_URL: 'https://api.archon.example.com',
+        FRONTEND_URL: 'https://archon.example.com',
+        DATABASE_URL: 'mysql://dowinn:dowinn@127.0.0.1:3308/dowinn',
+        JWT_ACCESS_SECRET: 'production-access-secret-123',
+        JWT_REFRESH_SECRET: 'production-refresh-secret-123',
+        MAIL_PROVIDER: 'resend',
+        RESEND_API_KEY: 're_test',
+        NODE_ENV: 'production',
+      },
+      {
+        abortEarly: false,
+      },
+    );
+
+    expect(result.error?.message).toContain('MAIL_FROM or SMTP_FROM');
   });
 });

@@ -1,5 +1,12 @@
 import Joi from 'joi';
 
+type MailProviderValidationShape = {
+  MAIL_PROVIDER?: 'smtp' | 'resend';
+  RESEND_API_KEY?: string;
+  MAIL_FROM?: string;
+  SMTP_FROM?: string;
+};
+
 export const environmentValidationSchema = Joi.object({
   APP_ENV: Joi.string()
     .valid('local', 'development', 'test', 'staging', 'prod', 'production')
@@ -18,17 +25,46 @@ export const environmentValidationSchema = Joi.object({
   REFRESH_COOKIE_NAME: Joi.string().default('archon_refresh_token'),
   REFRESH_COOKIE_SECURE: Joi.boolean().optional(),
   TRUST_PROXY_HOPS: Joi.number().integer().min(0).optional(),
+  MAIL_PROVIDER: Joi.string().valid('smtp', 'resend').default('smtp'),
+  MAIL_FROM: Joi.string().trim().min(3).optional(),
+  RESEND_API_KEY: Joi.string().trim().optional(),
   SMTP_HOST: Joi.string().hostname().optional(),
   SMTP_PORT: Joi.number().port().optional(),
   SMTP_SECURE: Joi.boolean().optional(),
   SMTP_USER: Joi.string().optional(),
   SMTP_PASS: Joi.string().optional(),
   SMTP_FROM: Joi.string().email().optional(),
+  SMTP_CONNECTION_TIMEOUT_MS: Joi.number().integer().min(1000).optional(),
   SEED_ENABLED: Joi.boolean().default(false),
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
     .default('development'),
-});
+})
+  .custom((rawValue: unknown, helpers) => {
+    const value = rawValue as MailProviderValidationShape;
+
+    if (value.MAIL_PROVIDER !== 'resend') {
+      return rawValue;
+    }
+
+    if (!value.RESEND_API_KEY) {
+      return helpers.error('any.custom', {
+        customMessage: 'RESEND_API_KEY is required when MAIL_PROVIDER=resend',
+      });
+    }
+
+    if (!value.MAIL_FROM && !value.SMTP_FROM) {
+      return helpers.error('any.custom', {
+        customMessage:
+          'MAIL_FROM or SMTP_FROM is required when MAIL_PROVIDER=resend',
+      });
+    }
+
+    return rawValue;
+  }, 'mail provider configuration')
+  .messages({
+    'any.custom': '{{#customMessage}}',
+  });
 
 export function getEnvironmentFilePaths() {
   const appEnv = normalizeEnvironmentSelector(process.env.APP_ENV);

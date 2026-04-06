@@ -16,13 +16,19 @@ export type AppRuntimeConfig = {
   nodeEnv: 'development' | 'test' | 'production';
 };
 
+export type MailProvider = 'smtp' | 'resend';
+
 export type MailRuntimeConfig = {
+  mailProvider: MailProvider;
+  mailFrom: string | null;
+  resendApiKey: string | null;
   smtpHost: string | null;
   smtpPort: number | null;
   smtpSecure: boolean | null;
   smtpUser: string | null;
   smtpPass: string | null;
   smtpFrom: string | null;
+  smtpConnectionTimeoutMs: number;
   frontendUrl: string;
   nodeEnv: 'development' | 'test' | 'production';
 };
@@ -82,14 +88,23 @@ export function getMailRuntimeConfig(
   configService: ConfigService,
 ): MailRuntimeConfig {
   const { frontendUrl, nodeEnv } = getAppRuntimeConfig(configService);
+  const mailFrom =
+    configService.get<string>('MAIL_FROM') ??
+    configService.get<string>('SMTP_FROM') ??
+    null;
 
   return {
+    mailProvider: configService.get<MailProvider>('MAIL_PROVIDER') ?? 'smtp',
+    mailFrom,
+    resendApiKey: configService.get<string>('RESEND_API_KEY') ?? null,
     smtpHost: configService.get<string>('SMTP_HOST') ?? null,
     smtpPort: configService.get<number>('SMTP_PORT') ?? null,
     smtpSecure: configService.get<boolean>('SMTP_SECURE') ?? null,
     smtpUser: configService.get<string>('SMTP_USER') ?? null,
     smtpPass: configService.get<string>('SMTP_PASS') ?? null,
     smtpFrom: configService.get<string>('SMTP_FROM') ?? null,
+    smtpConnectionTimeoutMs:
+      configService.get<number>('SMTP_CONNECTION_TIMEOUT_MS') ?? 10_000,
     frontendUrl,
     nodeEnv,
   };
